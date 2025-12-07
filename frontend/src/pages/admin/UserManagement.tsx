@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { api } from '../../services/api';
 import type { Division, Department, SubDepartment } from '../../types';
 
@@ -27,7 +26,6 @@ const UserRole = {
 export default function UserManagement() {
   const { user, token } = useAuth();
   const navigate = useNavigate();
-  const API_BASE = 'http://127.0.0.1:8001';
 
   // Main state
   const [users, setUsers] = useState<User[]>([]);
@@ -141,10 +139,8 @@ export default function UserManagement() {
   const fetchUsers = async () => {
     if (!token) return;
     try {
-      const response = await axios.get(`${API_BASE}/users`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setUsers(response.data);
+      const data = await api.getUsers(token);
+      setUsers(data);
     } catch (err) {
       console.error('Failed to load users:', err);
       showNotification('Failed to load users', 'error');
@@ -271,20 +267,12 @@ export default function UserManagement() {
       }
 
       if (editingUser) {
-        const response = await axios.put(
-          `${API_BASE}/users/${editingUser.id}`,
-          userData,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setUsers(users.map(u => u.id === editingUser.id ? response.data : u));
+        const data = await api.updateUser(token, editingUser.id, userData);
+        setUsers(users.map(u => u.id === editingUser.id ? data : u));
         showNotification('User updated successfully', 'success');
       } else {
-        const response = await axios.post(
-          `${API_BASE}/users`,
-          userData,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setUsers([...users, response.data]);
+        const data = await api.createUser(token, userData);
+        setUsers([...users, data]);
         showNotification('User created successfully', 'success');
       }
       handleCloseModal();
@@ -302,9 +290,7 @@ export default function UserManagement() {
   const handleConfirmDelete = async () => {
     if (!userToDelete || !token) return;
     try {
-      await axios.delete(`${API_BASE}/users/${userToDelete}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.deleteUser(token, userToDelete);
       setUsers(users.filter(u => u.id !== userToDelete));
       showNotification('User deleted successfully', 'success');
     } catch (err: any) {

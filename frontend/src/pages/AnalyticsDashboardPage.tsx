@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import axios from 'axios';
-import type { ComprehensiveDashboard } from '../types/analytics';
+import { api } from '../services/api';
 
 export const AnalyticsDashboardPage = () => {
     const { token } = useAuth();
@@ -15,15 +14,11 @@ export const AnalyticsDashboardPage = () => {
     }, [days]);
 
     const fetchDashboard = async () => {
+        if (!token) return;
         try {
             setLoading(true);
-            const response = await axios.get(
-                `http://localhost:8001/analytics/dashboard?days=${days}`,
-                {
-                    headers: { Authorization: `Bearer ${token}` }
-                }
-            );
-            setDashboard(response.data);
+            const data = await api.getAnalyticsDashboard(token, days);
+            setDashboard(data);
         } catch (error) {
             console.error('Failed to fetch dashboard:', error);
         } finally {

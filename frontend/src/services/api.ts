@@ -267,23 +267,24 @@ export const api = {
     },
 
     // Admin users management
+    // Admin users management
     getUsers: async (token: string) => {
-        const response = await client.get('/admin/users', withAuth(token));
+        const response = await client.get('/users', withAuth(token));
         return response.data;
     },
 
     createUser: async (token: string, data: any) => {
-        const response = await client.post('/admin/users', data, withAuth(token));
+        const response = await client.post('/users', data, withAuth(token));
         return response.data;
     },
 
     updateUser: async (token: string, id: number, data: any) => {
-        const response = await client.put(`/admin/users/${id}`, data, withAuth(token));
+        const response = await client.put(`/users/${id}`, data, withAuth(token));
         return response.data;
     },
 
     deleteUser: async (token: string, id: number) => {
-        const response = await client.delete(`/admin/users/${id}`, withAuth(token));
+        const response = await client.delete(`/users/${id}`, withAuth(token));
         return response.data;
     },
 
@@ -402,6 +403,14 @@ export const api = {
             ...withAuth(token),
             params: { days },
             responseType: 'blob'
+        });
+        return response.data;
+    },
+
+    getAnalyticsDashboard: async (token: string, days: number = 30) => {
+        const response = await client.get('/analytics/dashboard', {
+            ...withAuth(token),
+            params: { days }
         });
         return response.data;
     },
