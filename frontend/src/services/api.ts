@@ -1,7 +1,18 @@
 import axios from 'axios';
 import type { User, Request, RequestItem, Division, Department, SubDepartment, FleetRequest, HRDeployment, FinanceTransaction, ICTTicket, LogisticsRequest } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8001';
+// Dynamic API URL detection
+const getApiUrl = () => {
+    // 1. Prefer environment variable if set
+    if (import.meta.env.VITE_API_URL) {
+        return import.meta.env.VITE_API_URL;
+    }
+    // 2. Fallback to current hostname (for local network access)
+    // Assumes backend is on port 8000 of the same machine
+    return `http://${window.location.hostname}:8000`;
+};
+
+const API_BASE = getApiUrl();
 
 const client = axios.create({
     baseURL: API_BASE,
