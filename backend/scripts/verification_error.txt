@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "C:\Users\raeyy\OneDrive\Desktop\Final project\Tebita-SLA-System\backend\tests\verify_analytics.py", line 41, in verify_analytics
+    csv_buffer = generate_request_export_csv(db, start_date, end_date)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\raeyy\OneDrive\Desktop\Final project\Tebita-SLA-System\backend\app\services\reporting_service.py", line 101, in generate_request_export_csv
+    calculate_sla_status(req)
+  File "C:\Users\raeyy\OneDrive\Desktop\Final project\Tebita-SLA-System\backend\app\services\sla_calculator.py", line 39, in calculate_sla_status
+    if now > deadline:
+       ^^^^^^^^^^^^^^
+TypeError: can't compare offset-naive and offset-aware datetimes

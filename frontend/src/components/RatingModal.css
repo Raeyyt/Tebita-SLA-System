@@ -1,0 +1,157 @@
+.rating-modal {
+    max-width: 600px;
+    width: 90%;
+    background: white;
+    color: #1a1a1a;
+}
+
+.rating-modal .modal-header h2 {
+    color: #1a1a1a;
+}
+
+.rating-section {
+    padding: 2rem;
+}
+
+.rating-dimension {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 12px;
+    border: 1px solid #e0e0e0;
+    transition: all 0.3s ease;
+}
+
+.rating-dimension:hover {
+    background: #f0f0f0;
+    border-color: #d0d0d0;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dimension-header {
+    margin-bottom: 1rem;
+}
+
+.dimension-label {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    color: #1a1a1a;
+}
+
+.dimension-description {
+    font-size: 0.875rem;
+    color: #666;
+}
+
+.stars {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.star {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    color: #ddd;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0;
+    line-height: 1;
+}
+
+.star:hover {
+    transform: scale(1.2);
+}
+
+.star.filled {
+    color: #ffc107;
+    text-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
+}
+
+.score-text {
+    margin-left: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #007bff;
+    min-width: 50px;
+}
+
+.overall-score {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: #e3f2fd;
+    border-radius: 12px;
+    border: 2px solid #007bff;
+    text-align: center;
+}
+
+.overall-label {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #1a1a1a;
+}
+
+.overall-value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: #007bff;
+}
+
+.rating-modal .form-group label {
+    color: #1a1a1a;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.rating-modal textarea {
+    width: 100%;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid #d0d0d0;
+    background: white;
+    color: #1a1a1a;
+    font-family: inherit;
+    resize: vertical;
+    transition: all 0.3s ease;
+}
+
+.rating-modal textarea:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.rating-modal textarea::placeholder {
+    color: #999;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    padding: 1.5rem 2rem;
+    border-top: 1px solid #e0e0e0;
+    background: #f8f9fa;
+}
+
+/* Animations */
+@keyframes starPulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+.star.filled {
+    animation: starPulse 0.3s ease;
+}

@@ -1,0 +1,183 @@
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
+import type { Request } from '../types';
+import { PDFViewerModal } from '../components/PDFViewerModal';
+
+export const RequestsPage = () => {
+    const { token } = useAuth();
+    const [requests, setRequests] = useState<Request[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [filter, setFilter] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
+    const [isPdfOpen, setIsPdfOpen] = useState(false);
+
+    useEffect(() => {
+        const loadRequests = async () => {
+            if (!token) return;
+            try {
+                const data = await api.getRequests(token);
+                setRequests(data);
+            } catch (err) {
+                console.error('Failed to load requests:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadRequests();
+    }, [token]);
+
+    // Filter requests by search term
+    const filteredRequests = requests.filter(request => {
+        const matchesSearch = !searchTerm ||
+            request.request_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            request.description?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesFilter = !filter || request.status === filter;
+        return matchesSearch && matchesFilter;
+    });
+
+    const getStatusBadge = (status: string) => {
+        const classMap: Record<string, string> = {
+            'PENDING': 'badge-pending',
+            'APPROVAL_PENDING': 'badge-warning',
+            'APPROVED': 'badge-info',
+            'IN_PROGRESS': 'badge-info',
+            'COMPLETED': 'badge-success',
+            'REJECTED': 'badge-error',
+            'CANCELLED': 'badge-error',
+        };
+        return `badge ${classMap[status] || 'badge-pending'}`;
+    };
+
+    const getPriorityBadge = (priority: string) => {
+        const classMap: Record<string, string> = {
+            'HIGH': 'badge-error',
+            'MEDIUM': 'badge-warning',
+            'LOW': 'badge-info',
+        };
+        return `badge ${classMap[priority] || 'badge-info'}`;
+    };
+
+    const openPdfModal = (request: Request) => {
+        setSelectedRequest(request);
+        setIsPdfOpen(true);
+    };
+
+    const closePdfModal = () => {
+        setIsPdfOpen(false);
+        setSelectedRequest(null);
+    };
+
+    if (loading) {
+        return <div className="spinner"></div>;
+        {/* Status Filters */ }
+        <div className="flex gap-md" style={{ marginBottom: '1.5rem' }}>
+            <button
+                className={`btn ${!filter ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => setFilter('')}
+            >
+                All
+            </button>
+            <button
+                className={`btn ${filter === 'PENDING' ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => setFilter('PENDING')}
+            >
+                Pending
+            </button>
+            <button
+                className={`btn ${filter === 'IN_PROGRESS' ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => setFilter('IN_PROGRESS')}
+            >
+                In Progress
+            </button>
+            <button
+                className={`btn ${filter === 'COMPLETED' ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => setFilter('COMPLETED')}
+            >
+                Completed
+            </button>
+        </div>
+
+        {
+            filteredRequests.length === 0 ? (
+                <p className="text-muted">No requests found</p>
+            ) : (
+            <div className="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Request ID</th>
+                            <th>Sender</th>
+                            <th>Recipient</th>
+                            <th>Description</th>
+                            <th>Priority</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filteredRequests.map((request) => (
+                            <tr key={request.id}>
+                                <td className="font-bold">{request.request_id}</td>
+                                <td>
+                                    <div>
+                                        <div className="font-bold">{request.requester?.full_name || 'N/A'}</div>
+                                        <div className="text-small text-muted">
+                                            {request.requester_subdepartment?.name ||
+                                                request.requester_department?.name ||
+                                                request.requester_division?.name || ''}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div className="text-small text-muted">
+                                        {request.assigned_subdepartment?.name ||
+                                            request.assigned_department?.name ||
+                                            request.assigned_division?.name || 'Unassigned'}
+                                    </div>
+                                </td>
+                                <td style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {request.description}
+                                </td>
+                                <td>
+                                    <span className={getPriorityBadge(request.priority)}>
+                                        {request.priority}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span className={getStatusBadge(request.status)}>
+                                        {request.status.replace(/_/g, ' ')}
+                                    </span>
+                                </td>
+                                <td>{new Date(request.created_at).toLocaleDateString()}</td>
+                                <td>
+                                    <button
+                                        className="btn btn-outline"
+                                        style={{ padding: '0.5rem 1rem' }}
+                                        onClick={() => openPdfModal(request)}
+                                    >
+                                        View PDF
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        )
+        }
+            </div >
+    { selectedRequest && (
+        <PDFViewerModal
+            requestId={selectedRequest.id}
+            requestNumber={selectedRequest.request_id}
+            isOpen={isPdfOpen}
+            onClose={closePdfModal}
+        />
+    )}
+        </div >
+    );
+};

@@ -1,0 +1,66 @@
+Traceback (most recent call last):
+  File "C:\Users\raeyy\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\raeyy\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+sqlite3.OperationalError: no such table: requests
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\raeyy\OneDrive\Desktop\Final project\Tebita-SLA-System\backend\tests\verify_analytics.py", line 22, in verify_analytics
+    scorecard = calculate_overall_scorecard(db, start_date=start_date, end_date=end_date)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\raeyy\OneDrive\Desktop\Final project\Tebita-SLA-System\backend\app\services\scorecard_calculator.py", line 13, in calculate_overall_scorecard
+    efficiency_score = _calculate_service_efficiency(db, division_id, department_id, start_date, end_date)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\raeyy\OneDrive\Desktop\Final project\Tebita-SLA-System\backend\app\services\scorecard_calculator.py", line 60, in _calculate_service_efficiency
+    total = query.count()
+            ^^^^^^^^^^^^^
+  File "C:\Users\raeyy\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\orm\query.py", line 3132, in count
+    self._legacy_from_self(col).enable_eagerloads(False).scalar()
+  File "C:\Users\raeyy\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\orm\query.py", line 2825, in scalar
+    ret = self.one()
+          ^^^^^^^^^^
+  File "C:\Users\raeyy\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\orm\query.py", line 2798, in one
+    return self._iter().one()  # type: ignore
+           ^^^^^^^^^^^^
+  File "C:\Users\raeyy\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\orm\query.py", line 2847, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\raeyy\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\orm\session.py", line 2308, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\raeyy\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\orm\session.py", line 2190, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\raeyy\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\orm\context.py", line 293, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "C:\Users\raeyy\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 1416, in execute
+    return meth(
+           ^^^^^
+  File "C:\Users\raeyy\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\sql\elements.py", line 517, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\raeyy\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 1639, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\raeyy\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\raeyy\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\Users\raeyy\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 2344, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\raeyy\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\raeyy\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\engine\default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such table: requests
+[SQL: SELECT count(*) AS count_1 
+FROM (SELECT requests.id AS requests_id, requests.request_id AS requests_request_id, requests.request_type AS requests_request_type, requests.resource_type AS requests_resource_type, requests.requester_id AS requests_requester_id, requests.requester_division_id AS requests_requester_division_id, requests.requester_department_id AS requests_requester_department_id, requests.requester_subdepartment_id AS requests_requester_subdepartment_id, requests.assigned_division_id AS requests_assigned_division_id, requests.assigned_department_id AS requests_assigned_department_id, requests.assigned_subdepartment_id AS requests_assigned_subdepartment_id, requests.assigned_to_user_id AS requests_assigned_to_user_id, requests.priority AS requests_priority, requests.status AS requests_status, requests.sla_response_time_hours AS requests_sla_response_time_hours, requests.sla_completion_time_hours AS requests_sla_completion_time_hours, requests.sla_response_deadline AS requests_sla_response_deadline, requests.sla_completion_deadline AS requests_sla_completion_deadline, requests.actual_response_time AS requests_actual_response_time, requests.actual_completion_time AS requests_actual_completion_time, requests.reason_for_delay AS requests_reason_for_delay, requests.cost_estimate AS requests_cost_estimate, requests.actual_cost AS requests_actual_cost, requests.satisfaction_rating AS requests_satisfaction_rating, requests.satisfaction_comment AS requests_satisfaction_comment, requests.created_at AS requests_created_at, requests.submitted_at AS requests_submitted_at, requests.approved_at AS requests_approved_at, requests.started_at AS requests_started_at, requests.completed_at AS requests_completed_at, requests.acknowledged_at AS requests_acknowledged_at, requests.acknowledged_by_user_id AS requests_acknowledged_by_user_id, requests.completion_validated_at AS requests_completion_validated_at, requests.completion_validated_by_user_id AS requests_completion_validated_by_user_id, requests.description AS requests_description, requests.notes AS requests_notes, requests.attachments AS requests_attachments, requests.approval_required AS requests_approval_required, requests.approved_by_user_id AS requests_approved_by_user_id 
+FROM requests 
+WHERE requests.created_at >= ? AND requests.created_at <= ?) AS anon_1]
+[parameters: ('2025-11-05 19:36:55.048029', '2025-12-05 19:36:55.048029')]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)

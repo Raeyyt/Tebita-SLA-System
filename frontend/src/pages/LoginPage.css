@@ -1,0 +1,280 @@
+/* Glassmorphic Login Page - Tebita Branded - Black Text */
+
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e8eef5 50%, #ffffff 100%);
+    background-image: url('/login-bg.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.login-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(97, 1, 0, 0.05) 0%, rgba(255, 255, 255, 0.03) 100%);
+    z-index: 1;
+}
+
+/* Glassmorphic Card */
+.login-card-glass {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 480px;
+    margin: 2rem;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border-radius: 32px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow:
+        0 8px 32px 0 rgba(31, 38, 135, 0.37),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+    padding: 3rem 2.5rem;
+    animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Header */
+.login-header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.login-logo-container {
+    margin-bottom: 1.5rem;
+}
+
+.login-logo {
+    max-width: 200px;
+    height: auto;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
+}
+
+.login-title {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: #000000;
+    margin-bottom: 0.5rem;
+    text-shadow: 0 1px 3px rgba(255, 255, 255, 0.3);
+}
+
+.login-subtitle {
+    font-size: 1rem;
+    color: rgba(0, 0, 0, 0.8);
+    font-weight: 400;
+}
+
+/* Form */
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Error Message */
+.login-error {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: rgba(239, 68, 68, 0.15);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 16px;
+    color: #991b1b;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.login-error svg {
+    flex-shrink: 0;
+    color: #dc2626;
+}
+
+/* Form Groups */
+.form-group-glass {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-label-glass {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #000000;
+    margin-left: 0.25rem;
+}
+
+.form-input-glass {
+    padding: 0.875rem 1.25rem;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 16px;
+    color: #000000;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+}
+
+.form-input-glass::placeholder {
+    color: rgba(0, 0, 0, 0.5);
+    font-weight: 400;
+}
+
+.form-input-glass:focus {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow: 0 4px 16px rgba(31, 38, 135, 0.2);
+}
+
+.form-input-glass:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Password Input Wrapper */
+.password-input-wrapper {
+    position: relative;
+}
+
+.password-input-wrapper .form-input-glass {
+    padding-right: 3rem;
+}
+
+.password-toggle-glass {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    color: rgba(0, 0, 0, 0.7);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.password-toggle-glass:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #000000;
+}
+
+/* Login Button */
+.login-button-glass {
+    padding: 1rem 2rem;
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 16px;
+    color: #000000;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 16px rgba(31, 38, 135, 0.2);
+}
+
+.login-button-glass:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.35);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(31, 38, 135, 0.3);
+}
+
+.login-button-glass:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.login-button-glass:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Footer */
+.login-footer-glass {
+    margin-top: 2rem;
+    text-align: center;
+    padding-top: 2rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.login-footer-glass p {
+    font-size: 0.875rem;
+    color: rgba(0, 0, 0, 0.7);
+    font-weight: 500;
+}
+
+/* Spinner */
+.spinner-small {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    border-top-color: #000000;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .login-card-glass {
+        margin: 1rem;
+        padding: 2rem 1.5rem;
+        border-radius: 24px;
+    }
+
+    .login-title {
+        font-size: 1.5rem;
+    }
+
+    .form-input-glass {
+        padding: 0.75rem 1rem;
+    }
+
+    .login-button-glass {
+        padding: 0.875rem 1.5rem;
+    }
+
+    .login-logo {
+        max-width: 160px;
+    }
+}

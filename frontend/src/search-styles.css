@@ -1,0 +1,140 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+:root {
+    /* Tebita Refined Color Palette - Cherry Red + Noir + Cotton */
+    --primary: #610100;
+    /* Cherry Red - Main brand color */
+    --primary-dark: #830000;
+    /* Maroon - Deep accent */
+    --primary-light: #A41E22;
+    /* Lighter cherry red */
+
+    /* Noir & Neutrals */
+    --noir: #1B1717;
+    /* Noir Black - Dark UI elements */
+    --charcoal: #3C3C3C;
+    /* Dark Charcoal */
+    --cotton: #EDEBDD;
+    /* Cotton Cream - Soft backgrounds */
+
+    /* Grayscale - Refined */
+    --white: #FFFFFF;
+    --black: #000000;
+    --gray-50: #F9F8F6;
+    /* Warm light gray */
+    --gray-100: #F3F1ED;
+    /* Cotton-tinted */
+    --gray-200: #E5E3DC;
+    --gray-300: #D1CEC5;
+    --gray-400: #9C9A92;
+    --gray-500: #6B6962;
+    --gray-600: #4B4944;
+    --gray-700: #3C3C3C;
+    /* Charcoal */
+    --gray-800: #2A2826;
+    --gray-900: #1B1717;
+    /* Noir */
+
+    /* Semantic Colors */
+    --success: #10B981;
+    --warning: #F59E0B;
+    --error: #DC2626;
+    --info: #3B82F6;
+
+    /* Shadows - Refined */
+    --shadow-sm: 0 1px 2px 0 rgba(27, 23, 23, 0.05);
+    --shadow: 0 1px 3px 0 rgba(27, 23, 23, 0.1), 0 1px 2px -1px rgba(27, 23, 23, 0.1);
+    --shadow-md: 0 4px 6px -1px rgba(27, 23, 23, 0.1), 0 2px 4px -2px rgba(27, 23, 23, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(27, 23, 23, 0.1), 0 4px 6px -4px rgba(27, 23, 23, 0.1);
+    --shadow-xl: 0 20px 25px -5px rgba(27, 23, 23, 0.1), 0 8px 10px -6px rgba(27, 23, 23, 0.1);
+
+    /* Border Radius */
+    --radius-sm: 8px;
+    --radius: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --radius-full: 9999px;
+
+    /* Spacing */
+    --space-xs: 0.5rem;
+    --space-sm: 0.75rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+}
+
+/* Modern Search Bar - Matching Uploaded Design */
+.modern-search-bar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    max-width: 450px;
+    background: white;
+    border-radius: 50px;
+    overflow: hidden;
+    box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.08),
+        0 2px 8px rgba(0, 0, 0, 0.04);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modern-search-bar:focus-within {
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.12),
+        0 4px 12px rgba(0, 0, 0, 0.06);
+    transform: translateY(-2px);
+}
+
+.modern-search-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    padding: 0.875rem 1.5rem;
+    font-size: 0.9375rem;
+    color: var(--gray-700);
+    font-weight: 400;
+}
+
+.modern-search-input::placeholder {
+    color: #cbd5e0;
+    font-weight: 300;
+}
+
+.modern-search-button {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #2d3748;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin: 4px;
+    transition: all 0.3s ease;
+    box-shadow:
+        0 2px 8px rgba(45, 55, 72, 0.2),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.modern-search-button:hover {
+    background: #1a202c;
+    transform: scale(1.05);
+    box-shadow:
+        0 4px 12px rgba(45, 55, 72, 0.3),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+.modern-search-button:active {
+    transform: scale(0.98);
+}
+
+.modern-search-button svg {
+    width: 22px;
+    height: 22px;
+    stroke: white;
+    stroke-width: 2.5;
+}
