@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import List
 from datetime import datetime, timedelta
@@ -17,99 +17,114 @@ async def get_me_dashboard(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """M&E Dashboard - Central monitoring hub"""
-    now = datetime.utcnow()
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    week_start = now - timedelta(days=7)
-    month_start = now - timedelta(days=30)
-    
-    # Total requests
-    total_requests = db.query(Request).count()
-    
-    # Requests by status
-    pending = db.query(Request).filter(Request.status == RequestStatus.PENDING).count()
-    approval_pending = db.query(Request).filter(Request.status == RequestStatus.APPROVAL_PENDING).count()
-    in_progress = db.query(Request).filter(Request.status == RequestStatus.IN_PROGRESS).count()
-    completed = db.query(Request).filter(Request.status == RequestStatus.COMPLETED).count()
-    
-    # Today's activity
-    today_submitted = db.query(Request).filter(Request.created_at >= today_start).count()
-    today_completed = db.query(Request).filter(
-        Request.status == RequestStatus.COMPLETED,
-        Request.completed_at >= today_start
-    ).count()
-    
-    # SLA compliance (this month)
-    month_completed = db.query(Request).filter(
-        Request.status == RequestStatus.COMPLETED,
-        Request.completed_at >= month_start
-    ).all()
-    
-    within_sla = 0
-    for req in month_completed:
-        if req.completed_at and req.created_at and req.sla_completion_time_hours:
-            time_taken = (req.completed_at - req.created_at).total_seconds() / 3600
-            if time_taken <= req.sla_completion_time_hours:
-                within_sla += 1
-    
-    sla_compliance = (within_sla / len(month_completed) * 100) if month_completed else 0
-    
-    # Requests by division (counts)
-    division_stats = db.query(
-        Division.name,
-        func.count(Request.id).label('count')
-    ).join(Request, Request.requester_division_id == Division.id).group_by(Division.name).all()
+    try:
+        from ..services.access_control import apply_role_based_filtering
+        
+        now = datetime.utcnow()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_start = now - timedelta(days=7)
+        month_start = now - timedelta(days=30)
+        
+        # Helper to apply filtering
+        def filter_reqs(query):
+            return apply_role_based_filtering(query, current_user)
 
-    # Recent request activity (latest 50)
-    recent_requests = (
-        db.query(Request)
-        .join(Division, Request.requester_division_id == Division.id)
-        .outerjoin(Department, Request.requester_department_id == Department.id)
-        .order_by(Request.created_at.desc())
-        .limit(50)
-        .all()
-    )
-    division_requests = [
-        {
-            "division": req.requester_division.name if req.requester_division else None,
-            "department": req.requester_department.name if req.requester_department else None,
-            "request_id": req.request_id,
-            "description": req.description,
-            "created_at": req.created_at.isoformat() if req.created_at else None,
+        # Total requests
+        total_requests = filter_reqs(db.query(Request)).count()
+        
+        # Requests by status
+        pending = filter_reqs(db.query(Request).filter(Request.status == RequestStatus.PENDING)).count()
+        approval_pending = filter_reqs(db.query(Request).filter(Request.status == RequestStatus.APPROVAL_PENDING)).count()
+        in_progress = filter_reqs(db.query(Request).filter(Request.status == RequestStatus.IN_PROGRESS)).count()
+        completed = filter_reqs(db.query(Request).filter(Request.status == RequestStatus.COMPLETED)).count()
+        
+        # Today's activity
+        today_submitted = filter_reqs(db.query(Request).filter(Request.created_at >= today_start)).count()
+        today_completed = filter_reqs(db.query(Request).filter(
+            Request.status == RequestStatus.COMPLETED,
+            Request.completed_at >= today_start
+        )).count()
+        
+        # SLA compliance (this month)
+        month_completed = filter_reqs(db.query(Request).filter(
+            Request.status == RequestStatus.COMPLETED,
+            Request.completed_at >= month_start
+        )).all()
+        
+        within_sla = 0
+        for req in month_completed:
+            if req.completed_at and req.created_at and req.sla_completion_time_hours:
+                time_taken = (req.completed_at - req.created_at).total_seconds() / 3600
+                if time_taken <= req.sla_completion_time_hours:
+                    within_sla += 1
+        
+        sla_compliance = (within_sla / len(month_completed) * 100) if month_completed else 0
+        
+        # Requests by division (counts)
+        div_stats_query = db.query(
+            Division.name,
+            func.count(Request.id).label('count')
+        ).join(Request, Request.requester_division_id == Division.id)
+        
+        # Apply filtering to the join
+        div_stats_query = apply_role_based_filtering(div_stats_query, current_user, model=Request)
+        
+        division_stats = div_stats_query.group_by(Division.name).all()
+
+        # Recent request activity (latest 50)
+        recent_query = db.query(Request).options(
+            joinedload(Request.requester_division),
+            joinedload(Request.requester_department)
+        ).order_by(Request.created_at.desc())
+        
+        recent_requests = filter_reqs(recent_query).limit(50).all()
+        
+        division_requests = [
+            {
+                "division": req.requester_division.name if req.requester_division else None,
+                "department": req.requester_department.name if req.requester_department else None,
+                "request_id": req.request_id,
+                "description": req.description,
+                "created_at": req.created_at.isoformat() if req.created_at else None,
+            }
+            for req in recent_requests
+        ]
+        
+        # Overdue requests
+        active_query = db.query(Request).filter(
+            Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVED]),
+            Request.sla_completion_time_hours.isnot(None)
+        )
+        active_requests = filter_reqs(active_query).all()
+        
+        overdue_count = 0
+        for req in active_requests:
+            if req.created_at and req.sla_completion_time_hours:
+                deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
+                if now > deadline:
+                    overdue_count += 1
+        
+        return {
+            "total_requests": total_requests,
+            "status_breakdown": {
+                "pending": pending,
+                "approval_pending": approval_pending,
+                "in_progress": in_progress,
+                "completed": completed,
+            },
+            "today": {
+                "submitted": today_submitted,
+                "completed": today_completed,
+            },
+            "sla_compliance_month": round(sla_compliance, 2),
+            "overdue_requests": overdue_count,
+            "division_stats": [{"division": name, "count": count} for name, count in division_stats],
+            "division_requests": division_requests,
         }
-        for req in recent_requests
-    ]
-    
-    # Overdue requests
-    active_requests = db.query(Request).filter(
-        Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVED]),
-        Request.sla_completion_time_hours.isnot(None)
-    ).all()
-    
-    overdue_count = 0
-    for req in active_requests:
-        if req.created_at and req.sla_completion_time_hours:
-            deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
-            if now > deadline:
-                overdue_count += 1
-    
-    return {
-        "total_requests": total_requests,
-        "status_breakdown": {
-            "pending": pending,
-            "approval_pending": approval_pending,
-            "in_progress": in_progress,
-            "completed": completed,
-        },
-        "today": {
-            "submitted": today_submitted,
-            "completed": today_completed,
-        },
-        "sla_compliance_month": round(sla_compliance, 2),
-        "overdue_requests": overdue_count,
-        "division_stats": [{"division": name, "count": count} for name, count in division_stats],
-        "division_requests": division_requests,
-    }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error in ME Dashboard: {str(e)}")
 
 
 @router.get("/validation-queue")
@@ -118,13 +133,16 @@ async def get_validation_queue(
     current_user: User = Depends(get_current_active_user)
 ):
     """Get requests pending M&E validation"""
-    # Requests that need validation (completed but not yet validated)
-    # This is a placeholder - you can add a validation status field later
-    completed_requests = db.query(Request).filter(
-        Request.status == RequestStatus.COMPLETED
-    ).order_by(Request.completed_at.desc()).limit(20).all()
+    from ..services.access_control import apply_role_based_filtering
     
-    return completed_requests
+    # Requests that need validation (completed but not yet validated)
+    query = db.query(Request).filter(
+        Request.status == RequestStatus.COMPLETED
+    ).order_by(Request.completed_at.desc())
+    
+    query = apply_role_based_filtering(query, current_user)
+    
+    return query.limit(20).all()
 
 
 @router.get("/activity-log")
@@ -134,8 +152,9 @@ async def get_activity_log(
     current_user: User = Depends(get_current_active_user)
 ):
     """Get recent activity across all requests"""
-    recent_requests = db.query(Request).order_by(
-        Request.created_at.desc()
-    ).limit(limit).all()
+    from ..services.access_control import apply_role_based_filtering
     
-    return recent_requests
+    query = db.query(Request).order_by(Request.created_at.desc())
+    query = apply_role_based_filtering(query, current_user)
+    
+    return query.limit(limit).all()

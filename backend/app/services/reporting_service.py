@@ -5,7 +5,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.models import Request
 from app.services.sla_calculator import calculate_sla_status
 
@@ -73,12 +73,22 @@ def generate_request_export_csv(db: Session, start_date: datetime, end_date: dat
     # Header
     writer.writerow([
         'Request ID', 'Type', 'Priority', 'Status', 
-        'Created At', 'Completed At', 
+        'Sender Division', 'Sender Department', 'Sender Name',
+        'Recipient Division', 'Recipient Department', 'Recipient Name',
+        'Created At', 'Submitted At', 'Acknowledged At', 
+        'Completed At', 'Validated At',
         'SLA Deadline', 'Actual Completion (Hrs)', 'SLA Status'
     ])
     
     # Data
-    requests = db.query(Request).filter(
+    requests = db.query(Request).options(
+        joinedload(Request.requester),
+        joinedload(Request.requester_division),
+        joinedload(Request.requester_department),
+        joinedload(Request.assigned_to),
+        joinedload(Request.assigned_division),
+        joinedload(Request.assigned_department)
+    ).filter(
         Request.created_at >= start_date,
         Request.created_at <= end_date
     ).all()
@@ -94,8 +104,17 @@ def generate_request_export_csv(db: Session, start_date: datetime, end_date: dat
             req.request_type,
             req.priority,
             req.status,
+            req.requester_division.name if req.requester_division else "",
+            req.requester_department.name if req.requester_department else "",
+            req.requester.full_name if req.requester else "",
+            req.assigned_division.name if req.assigned_division else "",
+            req.assigned_department.name if req.assigned_department else "",
+            req.assigned_to.full_name if req.assigned_to else "Unassigned",
             req.created_at.isoformat() if req.created_at else "",
+            req.submitted_at.isoformat() if req.submitted_at else "",
+            req.acknowledged_at.isoformat() if req.acknowledged_at else "",
             req.completed_at.isoformat() if req.completed_at else "",
+            req.completion_validated_at.isoformat() if req.completion_validated_at else "",
             req.sla_completion_deadline.isoformat() if req.sla_completion_deadline else "",
             actual_hours,
             calculate_sla_status(req)

@@ -537,3 +537,230 @@ def calculate_requisition_accuracy(
     
     accurate = query.filter(LogisticsRequest.requisition_accurate == True).count()
     return round((accurate / total) * 100, 2)
+
+
+# ============================================================================
+# ADVANCED INTEGRATION & OPTIMIZATION KPIs
+# ============================================================================
+
+def calculate_integration_index(
+    db: Session,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None
+) -> float:
+    """
+    Integration Index (%)
+    Formula: Cross-division requests completed on time ÷ Total cross-division requests × 100
+    Measures efficiency of inter-divisional collaboration
+    """
+    query = db.query(Request).filter(
+        Request.requester_division_id != Request.assigned_division_id,
+        Request.status == RequestStatus.COMPLETED
+    )
+    
+    if start_date:
+        query = query.filter(Request.created_at >= start_date)
+    if end_date:
+        query = query.filter(Request.created_at <= end_date)
+    
+    total_cross_division = query.count()
+    if total_cross_division == 0:
+        return 0.0
+    
+    on_time_cross_division = query.filter(
+        Request.actual_completion_time <= Request.sla_completion_deadline
+    ).count()
+    
+    return round((on_time_cross_division / total_cross_division) * 100, 2)
+
+
+def calculate_resource_optimization_score(
+    db: Session,
+    division_id: Optional[int] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None
+) -> float:
+    """
+    Resource Optimization Score (%)
+    Formula: Average of (SLA Compliance + Cost Efficiency + Resource Utilization)
+    Composite metric for overall resource management
+    """
+    # Component 1: SLA Compliance
+    sla_compliance = calculate_sla_compliance_rate(db, division_id, None, start_date, end_date)
+    
+    # Component 2: Cost Efficiency (100% - overhead percentage)
+    query = db.query(Request).filter(Request.status == RequestStatus.COMPLETED)
+    if division_id:
+        query = query.filter(Request.requester_division_id == division_id)
+    if start_date:
+        query = query.filter(Request.created_at >= start_date)
+    if end_date:
+        query = query.filter(Request.created_at <= end_date)
+    
+    total_estimated = query.with_entities(func.sum(Request.cost_estimate)).scalar() or 1
+    total_actual = query.with_entities(func.sum(Request.actual_cost)).scalar() or 0
+    
+    # Cost efficiency: lower actual cost is better
+    cost_efficiency = max(0, (total_estimated - total_actual) / total_estimated * 100) if total_estimated > 0 else 0
+    cost_efficiency = min(100, 100 - abs(cost_efficiency))  # Normalize to 0-100
+    
+    # Component 3: Request Fulfillment Rate (proxy for resource utilization)
+    fulfillment = calculate_service_request_fulfillment_rate(db, division_id, start_date, end_date)
+    
+    # Average of all three
+    optimization_score = (sla_compliance + cost_efficiency + fulfillment) / 3
+    return round(optimization_score, 2)
+
+
+def calculate_cost_per_request(
+    db: Session,
+    division_id: Optional[int] = None,
+    resource_type: Optional[ResourceType] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None
+) -> float:
+    """
+    Cost Per Request
+    Formula: Total actual costs ÷ Total requests
+    """
+    query = db.query(Request)
+    
+    if division_id:
+        query = query.filter(Request.requester_division_id == division_id)
+    if resource_type:
+        query = query.filter(Request.resource_type == resource_type)
+    if start_date:
+        query = query.filter(Request.created_at >= start_date)
+    if end_date:
+        query = query.filter(Request.created_at <= end_date)
+    
+    total_requests = query.count()
+    if total_requests == 0:
+        return 0.0
+    
+    total_cost = query.with_entities(func.sum(Request.actual_cost)).scalar() or 0
+    return round(float(total_cost) / total_requests, 2)
+
+
+def calculate_department_efficiency_score(
+    db: Session,
+    department_id: int,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None
+) -> float:
+    """
+    Department Efficiency Score (%)
+    Formula: Geometric mean of (Completion Rate × SLA Compliance × Satisfaction)
+    Ensures balanced performance across all metrics
+    """
+    # Completion Rate
+    query = db.query(Request).filter(Request.assigned_department_id == department_id)
+    if start_date:
+        query = query.filter(Request.created_at >= start_date)
+    if end_date:
+        query = query.filter(Request.created_at <= end_date)
+    
+    total = query.count()
+    if total == 0:
+        return 0.0
+    
+    completed = query.filter(Request.status == RequestStatus.COMPLETED).count()
+    completion_rate = (completed / total) * 100
+    
+    # SLA Compliance
+    sla_compliance = calculate_sla_compliance_rate(db, None, department_id, start_date, end_date)
+    
+    # Customer Satisfaction (normalize to 0-100 from 1-5 scale)
+    satisfaction_query = query.filter(Request.satisfaction_rating.isnot(None))
+    avg_satisfaction = satisfaction_query.with_entities(
+        func.avg(Request.satisfaction_rating)
+    ).scalar() or 0
+    satisfaction_score = ((float(avg_satisfaction) - 1) / 4) * 100  # Convert 1-5 to 0-100
+    
+    # Geometric mean (balanced across all metrics)
+    efficiency = (completion_rate * sla_compliance * satisfaction_score) ** (1/3)
+    return round(efficiency, 2)
+
+
+def calculate_average_response_time_by_priority(
+    db: Session,
+    priority: Priority,
+    division_id: Optional[int] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None
+) -> float:
+    """
+    Average Response Time by Priority (hours)
+    Formula: Average (actual_response_time - created_at) for specific priority
+    """
+    query = db.query(Request).filter(
+        Request.priority == priority,
+        Request.actual_response_time.isnot(None)
+    )
+    
+    if division_id:
+        query = query.filter(Request.assigned_division_id == division_id)
+    if start_date:
+        query = query.filter(Request.created_at >= start_date)
+    if end_date:
+        query = query.filter(Request.created_at <= end_date)
+    
+    requests = query.all()
+    if not requests:
+        return 0.0
+    
+    total_hours = sum(
+        (r.actual_response_time - r.created_at).total_seconds() / 3600
+        for r in requests
+    )
+    
+    return round(total_hours / len(requests), 2)
+
+
+def calculate_completed_in_period(
+    db: Session,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None
+) -> int:
+    """Count requests completed within the time period"""
+    query = db.query(Request).filter(
+        Request.status == RequestStatus.COMPLETED,
+        Request.actual_completion_time.isnot(None)
+    )
+    
+    if start_date:
+        query = query.filter(Request.actual_completion_time >= start_date)
+    if end_date:
+        query = query.filter(Request.actual_completion_time <= end_date)
+        
+    return query.count()
+
+
+def calculate_kpi_metrics(
+    db: Session,
+    period: str = "monthly",
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None
+):
+    """
+    Comprehensive KPI calculation for dashboard display
+    Returns dict with all key metrics
+    """
+    if not start_date or not end_date:
+        # Default to monthly if not provided
+        from app.services.trend_calculator import get_time_range
+        start_date, end_date = get_time_range(period, start_date, end_date)
+    
+    return {
+        "sla_compliance": calculate_sla_compliance_rate(db, None, None, start_date, end_date),
+        "fulfillment_rate": calculate_service_request_fulfillment_rate(db, None, start_date, end_date),
+        "completed_count": calculate_completed_in_period(db, start_date, end_date),
+        "satisfaction": calculate_customer_satisfaction_score(db, None, start_date, end_date),
+        "integration_index": calculate_integration_index(db, start_date, end_date),
+        "resource_optimization": calculate_resource_optimization_score(db, None, start_date, end_date),
+        "avg_cost_per_request": calculate_cost_per_request(db, None, None, start_date, end_date),
+        "high_priority_response_time": calculate_average_response_time_by_priority(db, Priority.HIGH, None, start_date, end_date),
+        "medium_priority_response_time": calculate_average_response_time_by_priority(db, Priority.MEDIUM, None, start_date, end_date),
+        "low_priority_response_time": calculate_average_response_time_by_priority(db, Priority.LOW, None, start_date, end_date),
+    }
+

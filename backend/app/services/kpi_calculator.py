@@ -3,13 +3,15 @@ from sqlalchemy import func, case, extract
 from app.models import Request, RequestStatus, Priority, FleetRequest, HRDeployment, FinanceTransaction, ICTTicket, LogisticsRequest, CustomerSatisfaction
 from datetime import datetime, timedelta
 
-def calculate_kpi_metrics(db: Session, department_id: int = None):
+def calculate_kpi_metrics(db: Session, department_id: int = None, division_id: int = None):
     """
-    Calculates real-time KPI metrics for a given department (or all if None).
+    Calculates real-time KPI metrics for a given department/division (or all if None).
     """
     query = db.query(Request)
     if department_id:
         query = query.filter(Request.assigned_department_id == department_id)
+    if division_id:
+        query = query.filter(Request.assigned_division_id == division_id)
         
     # Base stats
     total_requests = query.count()
@@ -42,6 +44,8 @@ def calculate_kpi_metrics(db: Session, department_id: int = None):
     
     if department_id:
         avg_time_query = avg_time_query.filter(Request.assigned_department_id == department_id)
+    if division_id:
+        avg_time_query = avg_time_query.filter(Request.assigned_division_id == division_id)
         
     avg_seconds = avg_time_query.scalar() or 0
     avg_hours = round(avg_seconds / 3600, 1)

@@ -134,13 +134,15 @@ export const LoginPage = () => {
                         src="/raey-logo.png"
                         alt="RAEY"
                         style={{
-                            height: '80px',
+                            height: '50px',
                             marginTop: '0.25rem',
                             objectFit: 'contain'
                         }}
                     />
                 </div>
+                <div className="beta-version-label">Beta</div>
             </div>
         </div>
+
     );
 };

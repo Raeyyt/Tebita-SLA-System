@@ -1,27 +1,54 @@
 from datetime import datetime, timedelta, timezone
+from sqlalchemy.orm import Session
 from app.models import Request, RequestStatus
 from .sla_policy import get_sla_standards
+from app.sla_utils import get_sla_policy
 
-def calculate_deadlines(request: Request):
+def calculate_deadlines(request: Request, db: Session = None):
     """
     Calculates and sets the SLA deadlines (response and completion)
-    based on the request's resource type and priority.
+    based on the request's activity type, resource type, and priority.
+    
+    Now supports policy-based lookup from sla_policies table.
+    Falls back to legacy standards if no policy found or db not provided.
     """
     if not request.created_at:
         return
-
-    standards = get_sla_standards(request.resource_type, request.priority)
     
-    # Calculate deadlines
-    response_hours = standards["response"]
-    resolution_hours = standards["resolution"]
+    response_hours = None
+    resolution_hours = None
     
-    request.sla_response_time_hours = int(response_hours) if response_hours >= 1 else 1 # Store as int, min 1
+    # Try policy-based lookup if db session provided
+    if db and hasattr(request, 'activity_type') and request.activity_type:
+        policy = get_sla_policy(
+            db=db,
+            resource_type=request.resource_type,
+            activity_type=request.activity_type,
+            priority=request.priority,
+            division_id=request.assigned_division_id,
+            department_id=request.assigned_department_id
+        )
+        
+        if policy:
+            response_hours = policy.response_time_hours
+            resolution_hours = policy.completion_time_hours
+    
+    # Fallback to legacy standards if no policy found
+    if response_hours is None or resolution_hours is None:
+        standards = get_sla_standards(request.resource_type, request.priority)
+        if response_hours is None:
+            response_hours = standards["response"]
+        if resolution_hours is None:
+            resolution_hours = standards["resolution"]
+    
+    # Store SLA hours
+    request.sla_response_time_hours = int(response_hours) if response_hours >= 1 else 1  # Min 1 hour, store as int
     request.sla_completion_time_hours = int(resolution_hours)
     
-    # Add hours to created_at (ensure timezone awareness)
+    # Calculate deadlines from created_at
     request.sla_response_deadline = request.created_at + timedelta(hours=response_hours)
     request.sla_completion_deadline = request.created_at + timedelta(hours=resolution_hours)
+
 
 def calculate_sla_status(request: Request) -> dict:
     """

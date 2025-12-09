@@ -156,6 +156,7 @@ class RequestItemRead(RequestItemBase):
 class RequestBase(BaseModel):
     request_type: str
     resource_type: ResourceType = ResourceType.GENERAL
+    activity_type: Optional[str] = None  # ActivityType enum value (optional for backward compatibility)
     requester_division_id: int
     requester_department_id: Optional[int] = None
     requester_subdepartment_id: Optional[int] = None
@@ -169,6 +170,7 @@ class RequestBase(BaseModel):
     sla_completion_time_hours: Optional[int] = None
     cost_estimate: Optional[Decimal] = None
     actual_cost: Optional[Decimal] = None
+    attachments: Optional[List[dict]] = None
 
 
 class RequestCreate(RequestBase):

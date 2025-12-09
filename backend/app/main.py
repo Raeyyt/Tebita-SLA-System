@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .database import Base, engine
-from .routers import auth, divisions, departments, requests, sla, me, kpis, dashboard, pdf, uploads, resources, analytics, ws, role_dashboard, notifications, users, satisfaction, settings as settings_router_module
+from .routers import auth, divisions, departments, requests, sla, me, kpis, dashboard, pdf, uploads, resources, analytics, ws, role_dashboard, notifications, users, satisfaction, settings as settings_router_module, visual_analytics
 
 from .websocket.redis_pubsub import init_redis, start_listener, stop_listener
 from .services.scheduler import start_scheduler, stop_scheduler
@@ -49,6 +49,7 @@ app.include_router(kpis.router)
 app.include_router(resources.router)
 app.include_router(analytics.router)
 app.include_router(satisfaction.router)
+app.include_router(visual_analytics.router)
 app.include_router(settings_router_module.router)
 app.include_router(ws.router)
 

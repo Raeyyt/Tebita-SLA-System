@@ -40,10 +40,19 @@ export const NewRequestPage = () => {
     const [items, setItems] = useState<RequestItemForm[]>([
         { item_description: '', quantity: undefined, unit_price: undefined, notes: '', file: undefined }
     ]);
+    const [requestFiles, setRequestFiles] = useState<File[]>([]);
 
     useEffect(() => {
         const loadData = async () => {
-            if (!token) return;
+            if (!token || !user) return;
+
+            // Admin Restriction
+            if (user.role === 'ADMIN') {
+                alert("Administrators cannot create requests. Please use a standard user account.");
+                navigate('/dashboard');
+                return;
+            }
+
             try {
                 const [divisionsData, departmentsData] = await Promise.all([
                     api.getDivisions(token),
@@ -81,7 +90,7 @@ export const NewRequestPage = () => {
             }
         };
         loadData();
-    }, [token, user]);
+    }, [token, user, navigate]);
 
     // Load subdepartments when recipient department changes
     useEffect(() => {
@@ -169,27 +178,67 @@ export const NewRequestPage = () => {
             // Filter out nulls (empty items)
             const validItems = itemsWithUploads.filter(item => item !== null);
 
-            if (!senderDivisionId || !senderDepartmentId) {
-                throw new Error('Your profile must be assigned to a division and department before submitting requests. Please contact an administrator.');
+            // Basic sender validation - at minimum need division
+            if (!senderDivisionId) {
+                throw new Error('Your profile must be assigned to a division before submitting requests. Please contact an administrator.');
             }
 
-            if (!recipientSubDepartmentId) {
-                throw new Error('Please select a Sub-Department for the recipient.');
+            // Department and SubDepartment are now optional - allow sending to division level
+            // if (!recipientSubDepartmentId) {
+            //     throw new Error('Please select a Sub-Department for the recipient.');
+            // }
+
+            // Self-Request Validation
+            if (senderDivisionId === recipientDivisionId && senderDepartmentId === recipientDepartmentId) {
+                // If user has subdept, check if sending to same subdept
+                if (user.subdepartment_id && Number(recipientSubDepartmentId) === user.subdepartment_id) {
+                    throw new Error("You cannot send a request to your own Sub-Department.");
+                }
+                // If user is Dept Head (no subdept), check if sending to Dept-wide (no subdept selected - though UI enforces subdept selection now)
+                // or if logic dictates Dept Heads can't send to their own Dept at all (usually they assign tasks within)
+                // For now, we align with backend: if subdepts match, block.
+            }
+
+            // Upload request-level files if exist
+            let requestAttachments: any[] = [];
+            if (requestFiles.length > 0) {
+                try {
+                    // Upload files in parallel
+                    const uploadPromises = requestFiles.map(async (file) => {
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        const uploadResponse = await api.uploadItemFile(token, formData);
+                        return {
+                            attachment_filename: uploadResponse.filename,
+                            attachment_path: uploadResponse.saved_filename,
+                            attachment_type: uploadResponse.type
+                        };
+                    });
+
+                    requestAttachments = await Promise.all(uploadPromises);
+                } catch (err: any) {
+                    console.error("Failed to upload request files", err);
+                    const errorMessage = err.response?.data?.detail || err.message || "Unknown error";
+                    alert(`Failed to upload attachments: ${errorMessage}`);
+                    setLoading(false);
+                    return; // Stop submission if upload fails
+                }
             }
 
             await api.createRequest(token, {
                 request_type: 'GENERAL', // Default type
                 resource_type: resourceType,
                 requester_division_id: Number(senderDivisionId),
-                requester_department_id: Number(senderDepartmentId),
+                requester_department_id: senderDepartmentId ? Number(senderDepartmentId) : undefined,
                 requester_subdepartment_id: senderSubDepartmentId ? Number(senderSubDepartmentId) : undefined,
                 assigned_division_id: Number(recipientDivisionId),
-                assigned_department_id: Number(recipientDepartmentId),
+                assigned_department_id: recipientDepartmentId ? Number(recipientDepartmentId) : undefined,
                 assigned_subdepartment_id: recipientSubDepartmentId ? Number(recipientSubDepartmentId) : undefined,
                 priority: priority,
                 description: description,
                 notes: '',
                 items: validItems,
+                attachments: requestAttachments.length > 0 ? requestAttachments : undefined,
             });
 
             navigate('/requests');
@@ -294,7 +343,7 @@ export const NewRequestPage = () => {
                             </div>
 
                             <div className="form-group">
-                                <label className="form-label">Department *</label>
+                                <label className="form-label">Department (Optional)</label>
                                 <select
                                     className="form-select"
                                     value={recipientDepartmentId}
@@ -303,7 +352,6 @@ export const NewRequestPage = () => {
                                         setRecipientSubDepartmentId('');
                                     }}
                                     disabled={!recipientDivisionId}
-                                    required
                                 >
                                     <option value="">Select department</option>
                                     {recipientDepartments.map(dept => (
@@ -313,13 +361,12 @@ export const NewRequestPage = () => {
                             </div>
 
                             <div className="form-group">
-                                <label className="form-label">Sub-Department *</label>
+                                <label className="form-label">Sub-Department (Optional)</label>
                                 <select
                                     className="form-select"
                                     value={recipientSubDepartmentId}
                                     onChange={(e) => setRecipientSubDepartmentId(e.target.value)}
                                     disabled={!recipientDepartmentId || subDepartments.length === 0}
-                                    required
                                 >
                                     <option value="">
                                         {subDepartments.length === 0
@@ -334,7 +381,6 @@ export const NewRequestPage = () => {
                         </div>
                     </div>
 
-                    {/* Request Description */}
                     <div className="form-group">
                         <label className="form-label">Request Description *</label>
                         <textarea
@@ -345,6 +391,59 @@ export const NewRequestPage = () => {
                             rows={4}
                             placeholder="Describe your request in detail..."
                         />
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">Attachments (Optional)</label>
+                        <div className="file-input-wrapper">
+                            <input
+                                type="file"
+                                className="file-input-hidden"
+                                multiple
+                                onChange={(e) => {
+                                    if (e.target.files) {
+                                        const files = Array.from(e.target.files);
+
+                                        // Validation: Max 3 files
+                                        if (files.length > 3) {
+                                            alert("You can only upload a maximum of 3 files.");
+                                            e.target.value = ''; // Clear input
+                                            return;
+                                        }
+
+                                        // Validation: Max 10MB per file
+                                        const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+                                        const validFiles = files.filter(file => {
+                                            if (file.size > MAX_SIZE) {
+                                                alert(`File ${file.name} is too large. Max size is 10MB.`);
+                                                return false;
+                                            }
+                                            return true;
+                                        });
+
+                                        setRequestFiles(validFiles);
+                                    }
+                                }}
+                                accept=".doc,.docx,.xls,.xlsx,.pdf,.jpg,.jpeg,.png,.gif"
+                            />
+                            <div className="file-input-glass">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                </svg>
+                                <span>Choose Files</span>
+                            </div>
+                        </div>
+                        <small className="text-muted">Max 3 files, up to 10MB each (Word, Excel, PDF, Image)</small>
+                        {requestFiles.length > 0 && (
+                            <div style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
+                                <strong>Selected files:</strong>
+                                <ul style={{ margin: '0.25rem 0 0 1.2rem', padding: 0 }}>
+                                    {requestFiles.map((f, i) => (
+                                        <li key={i}>{f.name} ({(f.size / 1024 / 1024).toFixed(2)} MB)</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                     </div>
 
                     {/* Priority Type */}
@@ -423,12 +522,22 @@ export const NewRequestPage = () => {
 
                                 <div className="form-group">
                                     <label className="form-label">Item Description File</label>
-                                    <input
-                                        type="file"
-                                        className="form-input"
-                                        onChange={(e) => handleFileChange(index, e)}
-                                        accept=".doc,.docx,.xls,.xlsx,.pdf,.jpg,.jpeg.png,.gif"
-                                    />
+                                    <div className="file-input-wrapper">
+                                        <input
+                                            type="file"
+                                            className="file-input-hidden"
+                                            onChange={(e) => handleFileChange(index, e)}
+                                            accept=".doc,.docx,.xls,.xlsx,.pdf,.jpg,.jpeg,.png,.gif"
+                                        />
+                                        <div className="file-input-glass">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                            </svg>
+                                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
+                                                {item.file ? item.file.name : 'Choose File'}
+                                            </span>
+                                        </div>
+                                    </div>
                                     <small style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                                         Word, Excel, PDF, or Image
                                     </small>

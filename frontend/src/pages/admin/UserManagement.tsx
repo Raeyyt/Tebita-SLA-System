@@ -42,8 +42,11 @@ export default function UserManagement() {
   const [subdepartments, setSubdepartments] = useState<SubDepartment[]>([]);
 
   // Custom creation modals
+  const [showDivModal, setShowDivModal] = useState(false);
   const [showDeptModal, setShowDeptModal] = useState(false);
   const [showSubdeptModal, setShowSubdeptModal] = useState(false);
+  const [newDivName, setNewDivName] = useState('');
+  const [newDivType, setNewDivType] = useState('SUPPORT');
   const [newDeptName, setNewDeptName] = useState('');
   const [newSubdeptName, setNewSubdeptName] = useState('');
   const [selectedDivisionForDept, setSelectedDivisionForDept] = useState<number | null>(null);
@@ -196,6 +199,25 @@ export default function UserManagement() {
     setSubdepartments([]);
   };
 
+  // Custom division creation
+  const handleCreateDivision = async () => {
+    if (!newDivName || !token) return;
+    try {
+      await api.createDivision(token, {
+        name: newDivName,
+        type: newDivType,
+        description: newDivName
+      });
+      await fetchOrganizationalData();
+      setNewDivName('');
+      setNewDivType('SUPPORT');
+      setShowDivModal(false);
+      showNotification('Division created successfully', 'success');
+    } catch (err: any) {
+      showNotification(err?.response?.data?.detail || 'Failed to create division', 'error');
+    }
+  };
+
   // Custom department creation
   const handleCreateDepartment = async () => {
     if (!newDeptName || !selectedDivisionForDept || !token) return;
@@ -242,6 +264,12 @@ export default function UserManagement() {
     if (!editingUser && !formData.password) errors.password = 'Password is required';
     if (formData.password && formData.password.length < 8) errors.password = 'Password must be at least 8 characters';
     if (!formData.role) errors.role = 'Role is required';
+
+    // Mandatory Hierarchy Validation
+    if (!formData.division_id) errors.division_id = 'Division is required';
+    if (!formData.department_id) errors.department_id = 'Department is required';
+    if (!formData.subdepartment_id) errors.subdepartment_id = 'Sub-Department is required';
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -512,21 +540,35 @@ export default function UserManagement() {
 
               {/* Cascading Organizational Dropdowns */}
               <div className="form-group">
-                <label className="form-label">Division (Optional)</label>
-                <select
-                  className="form-select"
-                  value={formData.division_id}
-                  onChange={(e) => handleDivisionChange(e.target.value)}
-                >
-                  <option value="">-- Select Division --</option>
-                  {divisions.map(div => (
-                    <option key={div.id} value={div.id}>{div.name}</option>
-                  ))}
-                </select>
+                <label className="form-label">Division *</label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <select
+                    className="form-select"
+                    style={{ flex: 1 }}
+                    value={formData.division_id}
+                    onChange={(e) => handleDivisionChange(e.target.value)}
+                  >
+                    <option value="">-- Select Division --</option>
+                    {divisions.map(div => (
+                      <option key={div.id} value={div.id}>{div.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowDivModal(true)}
+                    className="btn btn-outline"
+                    title="Add New Division"
+                  >
+                    + New
+                  </button>
+                </div>
+                {formErrors.division_id && (
+                  <small style={{ color: 'var(--error)' }}>{formErrors.division_id}</small>
+                )}
               </div>
 
               <div className="form-group">
-                <label className="form-label">Department (Optional)</label>
+                <label className="form-label">Department *</label>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <select
                     className="form-select"
@@ -555,10 +597,14 @@ export default function UserManagement() {
                     + New
                   </button>
                 </div>
+
+                {formErrors.department_id && (
+                  <small style={{ color: 'var(--error)' }}>{formErrors.department_id}</small>
+                )}
               </div>
 
               <div className="form-group">
-                <label className="form-label">Sub-Department (Optional)</label>
+                <label className="form-label">Sub-Department *</label>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <select
                     className="form-select"
@@ -587,6 +633,10 @@ export default function UserManagement() {
                     + New
                   </button>
                 </div>
+
+                {formErrors.subdepartment_id && (
+                  <small style={{ color: 'var(--error)' }}>{formErrors.subdepartment_id}</small>
+                )}
               </div>
 
               <div className="flex gap-md" style={{ marginTop: '2rem' }}>
@@ -598,103 +648,157 @@ export default function UserManagement() {
                 </button>
               </div>
             </form>
+          </div >
+        </div >
+      )
+      }
+
+      {/* New Division Modal */}
+      {
+        showDivModal && (
+          <div className="modal-overlay" onClick={() => setShowDivModal(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+              <div className="card-header" style={{ marginBottom: '1rem' }}>
+                <h2 className="card-title">➕ Add New Division</h2>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Division Name *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={newDivName}
+                  onChange={(e) => setNewDivName(e.target.value)}
+                  placeholder="Enter division name"
+                  autoFocus
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Type *</label>
+                <select
+                  className="form-select"
+                  value={newDivType}
+                  onChange={(e) => setNewDivType(e.target.value)}
+                >
+                  <option value="SUPPORT">Support</option>
+                  <option value="INCOME_GENERATING">Income Generating</option>
+                </select>
+              </div>
+              <div className="flex gap-md" style={{ marginTop: '1.5rem' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleCreateDivision}
+                  disabled={!newDivName.trim()}
+                >
+                  Create Division
+                </button>
+                <button className="btn btn-outline" onClick={() => setShowDivModal(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* New Department Modal */}
-      {showDeptModal && (
-        <div className="modal-overlay" onClick={() => setShowDeptModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
-            <div className="card-header" style={{ marginBottom: '1rem' }}>
-              <h2 className="card-title">➕ Add New Department</h2>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Department Name *</label>
-              <input
-                type="text"
-                className="form-input"
-                value={newDeptName}
-                onChange={(e) => setNewDeptName(e.target.value)}
-                placeholder="Enter department name"
-                autoFocus
-              />
-            </div>
-            <div className="flex gap-md" style={{ marginTop: '1.5rem' }}>
-              <button
-                className="btn btn-primary"
-                onClick={handleCreateDepartment}
-                disabled={!newDeptName.trim()}
-              >
-                Create Department
-              </button>
-              <button className="btn btn-outline" onClick={() => setShowDeptModal(false)}>
-                Cancel
-              </button>
+      {
+        showDeptModal && (
+          <div className="modal-overlay" onClick={() => setShowDeptModal(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+              <div className="card-header" style={{ marginBottom: '1rem' }}>
+                <h2 className="card-title">➕ Add New Department</h2>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Department Name *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={newDeptName}
+                  onChange={(e) => setNewDeptName(e.target.value)}
+                  placeholder="Enter department name"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-md" style={{ marginTop: '1.5rem' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleCreateDepartment}
+                  disabled={!newDeptName.trim()}
+                >
+                  Create Department
+                </button>
+                <button className="btn btn-outline" onClick={() => setShowDeptModal(false)}>
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* New Sub-Department Modal */}
-      {showSubdeptModal && (
-        <div className="modal-overlay" onClick={() => setShowSubdeptModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
-            <div className="card-header" style={{ marginBottom: '1rem' }}>
-              <h2 className="card-title">➕ Add New Sub-Department</h2>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Sub-Department Name *</label>
-              <input
-                type="text"
-                className="form-input"
-                value={newSubdeptName}
-                onChange={(e) => setNewSubdeptName(e.target.value)}
-                placeholder="Enter sub-department name"
-                autoFocus
-              />
-            </div>
-            <div className="flex gap-md" style={{ marginTop: '1.5rem' }}>
-              <button
-                className="btn btn-primary"
-                onClick={handleCreateSubdepartment}
-                disabled={!newSubdeptName.trim()}
-              >
-                Create Sub-Department
-              </button>
-              <button className="btn btn-outline" onClick={() => setShowSubdeptModal(false)}>
-                Cancel
-              </button>
+      {
+        showSubdeptModal && (
+          <div className="modal-overlay" onClick={() => setShowSubdeptModal(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+              <div className="card-header" style={{ marginBottom: '1rem' }}>
+                <h2 className="card-title">➕ Add New Sub-Department</h2>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Sub-Department Name *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={newSubdeptName}
+                  onChange={(e) => setNewSubdeptName(e.target.value)}
+                  placeholder="Enter sub-department name"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-md" style={{ marginTop: '1.5rem' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleCreateSubdepartment}
+                  disabled={!newSubdeptName.trim()}
+                >
+                  Create Sub-Department
+                </button>
+                <button className="btn btn-outline" onClick={() => setShowSubdeptModal(false)}>
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
-            <div className="card-header" style={{ marginBottom: '1rem' }}>
-              <h2 className="card-title">Confirm Delete</h2>
-            </div>
-            <p style={{ marginBottom: '2rem' }}>
-              Are you sure you want to delete this user? This action cannot be undone.
-            </p>
-            <div className="flex gap-md">
-              <button
-                className="btn btn-outline"
-                onClick={handleConfirmDelete}
-                style={{ color: 'var(--error)', borderColor: 'var(--error)' }}
-              >
-                Delete User
-              </button>
-              <button className="btn btn-outline" onClick={() => setShowDeleteModal(false)}>
-                Cancel
-              </button>
+      {
+        showDeleteModal && (
+          <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+              <div className="card-header" style={{ marginBottom: '1rem' }}>
+                <h2 className="card-title">Confirm Delete</h2>
+              </div>
+              <p style={{ marginBottom: '2rem' }}>
+                Are you sure you want to delete this user? This action cannot be undone.
+              </p>
+              <div className="flex gap-md">
+                <button
+                  className="btn btn-outline"
+                  onClick={handleConfirmDelete}
+                  style={{ color: 'var(--error)', borderColor: 'var(--error)' }}
+                >
+                  Delete User
+                </button>
+                <button className="btn btn-outline" onClick={() => setShowDeleteModal(false)}>
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 }

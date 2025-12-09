@@ -4,7 +4,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
     
+    
     app_name: str = "Tebita SLA System"
+    app_version: str = "1.0.0-rc.1"
     secret_key: str = "tebita-sla-secret-key-change-in-production"
     access_token_expire_minutes: int = 480  # 8 hours
     algorithm: str = "HS256"
@@ -14,11 +16,23 @@ class Settings(BaseSettings):
     
     # CORS - Allow specific origins for credentials support
     allow_origins: list[str] = [
+        # Frontend development servers
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
         "http://localhost:3000",
-        "http://192.168.100.88:5173",  # Local Network Access
-        "*",  # Allow all origins for development
+        "http://127.0.0.1:3000",
+        # Backend ports (8000-8010 for flexibility)
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:8001",
+        "http://127.0.0.1:8001",
+        "http://localhost:8009",
+        "http://127.0.0.1:8009",
+        # Local network access
+        "http://192.168.100.88:5173",
+        "http://192.168.100.88:8000",
     ]
     
     # Celery/Redis

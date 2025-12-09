@@ -7,6 +7,7 @@ from ..database import get_db
 from ..auth import get_current_active_user
 from ..models import User, Request, CustomerSatisfaction, RequestStatus, Department
 from ..schemas import SatisfactionRatingCreate, SatisfactionRatingResponse, DepartmentRatingStats, UserBasic
+from ..services.access_control import apply_role_based_filtering
 
 router = APIRouter(prefix="/satisfaction", tags=["satisfaction"])
 
@@ -224,7 +225,9 @@ async def get_all_departments_analytics(
     from datetime import datetime, timedelta
     
     # Get all departments
-    departments = db.query(Department).all()
+    query = db.query(Department)
+    query = apply_role_based_filtering(query, current_user, model=Department)
+    departments = query.all()
     
     department_stats = []
     

@@ -34,3 +34,40 @@ python -m uvicorn app.main:app --reload --port 8000
 ## API Documentation
 
 Once running, visit: http://localhost:8000/docs
+
+## Package Management with UV
+
+This project uses [uv](https://github.com/astral-sh/uv) for fast package management.
+
+### Installation
+
+1. Install uv:
+   ```bash
+   pip install uv
+   ```
+
+### Setup
+
+1. Initialize the project (if not already done):
+   ```bash
+   uv init
+   ```
+
+2. Install dependencies:
+   ```bash
+   uv sync
+   ```
+
+### Adding Packages
+
+To add a new package:
+```bash
+uv add <package_name>
+```
+
+### Running Commands
+
+Run commands within the uv environment:
+```bash
+uv run uvicorn app.main:app --reload
+```

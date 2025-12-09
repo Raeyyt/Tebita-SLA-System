@@ -47,6 +47,7 @@ async def upload_item_file(
     current_user: User = Depends(get_current_user)
 ):
     """Upload a file for a request item (Word/Excel/PDF/Image)"""
+    print(f"Received upload request: {file.filename}, content_type={file.content_type}")
     
     # Validate file type
     if not is_allowed_file(file.filename):

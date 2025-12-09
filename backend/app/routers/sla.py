@@ -8,6 +8,7 @@ from ..database import get_db
 from ..auth import get_current_active_user
 from ..models import Request, RequestStatus, User, SLAAlert, AlertType
 from .. import schemas
+from ..services.access_control import apply_role_based_filtering
 
 router = APIRouter(prefix="/sla", tags=["sla"])
 
@@ -31,10 +32,12 @@ async def get_sla_compliance(
         start = now - timedelta(days=30)
     
     # Get completed requests in period
-    completed_requests = db.query(Request).filter(
+    query = db.query(Request).filter(
         Request.status == RequestStatus.COMPLETED,
         Request.completed_at >= start
-    ).all()
+    )
+    query = apply_role_based_filtering(query, current_user)
+    completed_requests = query.all()
     
     if not completed_requests:
         return {
@@ -83,9 +86,11 @@ async def get_active_alerts(
 ):
     """Get active SLA alerts"""
     # Get unacknowledged alerts
-    alerts = db.query(SLAAlert).filter(
+    query = db.query(SLAAlert).join(Request).filter(
         SLAAlert.acknowledged_at.is_(None)
-    ).order_by(SLAAlert.sent_at.desc()).limit(50).all()
+    )
+    query = apply_role_based_filtering(query, current_user, model=Request)
+    alerts = query.order_by(SLAAlert.sent_at.desc()).limit(50).all()
     
     return alerts
 
@@ -99,10 +104,12 @@ async def get_overdue_requests(
     now = datetime.utcnow()
     
     # Get in-progress and pending requests
-    active_requests = db.query(Request).filter(
+    query = db.query(Request).filter(
         Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVED]),
         Request.sla_completion_time_hours.isnot(None)
-    ).all()
+    )
+    query = apply_role_based_filtering(query, current_user)
+    active_requests = query.all()
     
     overdue = []
     for req in active_requests:
@@ -128,9 +135,11 @@ async def get_sla_dashboard(
     now = datetime.utcnow()
     
     # Active requests
-    active_requests = db.query(Request).filter(
+    query = db.query(Request).filter(
         Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVED])
-    ).all()
+    )
+    query = apply_role_based_filtering(query, current_user)
+    active_requests = query.all()
     
     # Categorize by SLA status
     on_track = 0
@@ -157,10 +166,12 @@ async def get_sla_dashboard(
     
     # Today's compliance
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_completed = db.query(Request).filter(
+    query = db.query(Request).filter(
         Request.status == RequestStatus.COMPLETED,
         Request.completed_at >= today_start
-    ).count()
+    )
+    query = apply_role_based_filtering(query, current_user)
+    today_completed = query.count()
     
     return {
         "active_requests": len(active_requests),

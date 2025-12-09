@@ -47,6 +47,99 @@ class ResourceType(str, enum.Enum):
     GENERAL = "GENERAL"  # Other/uncategorized requests
 
 
+class ActivityType(str, enum.Enum):
+    """Specific activity types for SLA policy matching"""
+    
+    # ===== FINANCE ACTIVITIES =====
+    FINANCE_PAYMENT_URGENT = "Payment Inquiry - Urgent"
+    FINANCE_PAYMENT_ROUTINE = "Payment Inquiry - Routine"
+    FINANCE_PAYMENT_NON_URGENT = "Payment Inquiry - Non-urgent"
+    FINANCE_MONTHLY_REPORT = "Monthly Financial Report"
+    FINANCE_QUARTERLY_REPORT = "Quarterly Financial Report"
+    FINANCE_ANNUAL_REPORT = "Annual Financial Report"
+    
+    # ===== STORE ACTIVITIES =====
+    STORE_MEDICAL_CRITICAL = "Medical Consumables - Critical"
+    STORE_MEDICAL_ROUTINE = "Medical Consumables - Routine"
+    STORE_DRUGS_EMERGENCY = "Emergency Drugs"
+    STORE_EQUIPMENT_MEDICAL = "Medical Equipment"
+    STORE_SPARES_CRITICAL = "Spare Parts - Critical"
+    STORE_SPARES_SCHEDULED = "Spare Parts - Scheduled"
+    STORE_SPARES_NON_URGENT = "Spare Parts - Non-urgent"
+    STORE_STATIONERY_OPERATIONAL = "Stationery - Operational"
+    STORE_STATIONERY_ADMIN = "Stationery - Administrative"
+    
+    # ===== FLEET/MAINTENANCE ACTIVITIES =====
+    FLEET_EMERGENCY_BREAKDOWN = "Emergency Breakdown"
+    FLEET_CRITICAL_FAILURE = "Critical Mechanical Failure"
+    FLEET_PREVENTIVE_MAINTENANCE = "Preventive Maintenance"
+    FLEET_EQUIPMENT_FAILURE_CRITICAL = "Medical Equipment Failure - Critical"
+    FLEET_EQUIPMENT_CALIBRATION = "Medical Equipment Calibration"
+    FLEET_TIRE_REPLACEMENT = "Tire Replacement/Damage"
+    FLEET_BODYWORK = "Bodywork & Minor Damage"
+    FLEET_BATTERY = "Battery Issues"
+    FLEET_LIGHT_SIREN_FAILURE = "Light & Siren System Failure"
+    FLEET_POWER_SYSTEM = "Inverter/Power System Failure"
+    FLEET_AC_VENTILATION = "AC/Ventilation Issues"
+    FLEET_SANITATION = "Interior Sanitation & Deep Cleaning"
+    FLEET_FUEL_SYSTEM = "Fuel System Maintenance"
+    
+    # ===== REFITTING ACTIVITIES =====
+    REFIT_SAFETY_CRITICAL = "Critical Safety Refitting"
+    REFIT_OXYGEN_SYSTEM = "Oxygen System Refitting"
+    REFIT_ELECTRICAL = "Electrical & Power System Refitting"
+    REFIT_INTERIOR = "Medical Cabinet & Interior Layout"
+    REFIT_STRETCHER = "Stretcher & Mounting System"
+    REFIT_SIREN_LIGHTS = "Siren & Light Bar Refitting"
+    REFIT_HVAC = "HVAC/AC Ventilation Refitting"
+    REFIT_COMMUNICATION = "Communication System Setup"
+    REFIT_BRANDING = "Exterior Branding & Sticker Refitting"
+    REFIT_MEDICAL_EQUIPMENT = "Medical Equipment Reinstallation"
+    REFIT_FIRE_SAFETY = "Fire Safety & IPC Installation"
+    REFIT_FULL_REFURBISHMENT = "Full Ambulance Refurbishment"
+    
+    # ===== HR ACTIVITIES =====
+    HR_RECRUITMENT_CRITICAL = "Recruitment - Critical Staffing Gap"
+    HR_RECRUITMENT_KEY_ROLES = "Recruitment - Key Roles"
+    HR_RECRUITMENT_ROUTINE = "Recruitment - Routine"
+    HR_PAYROLL_ISSUE = "Payroll Issue"
+    HR_MONTHLY_PAYROLL = "Monthly Payroll"
+    HR_CONTRACT_ISSUANCE = "Contract Issuance"
+    HR_DISCIPLINARY_CRITICAL = "Disciplinary Case - Critical"
+    HR_EXIT_CLEARANCE = "Exit Clearance"
+    HR_ROUTINE_REQUEST = "HR Routine Request"
+    
+    # ===== PROCUREMENT ACTIVITIES =====
+    PROCUREMENT_MEDICAL_EMERGENCY = "Procurement - Medical Emergency"
+    PROCUREMENT_MEDICAL_SCHEDULED = "Procurement - Medical Scheduled"
+    PROCUREMENT_SPARE_CRITICAL = "Procurement - Spare Parts Critical"
+    PROCUREMENT_SPARE_SCHEDULED = "Procurement - Spare Parts Scheduled"
+    PROCUREMENT_EQUIPMENT_CRITICAL = "Procurement - Equipment Critical"
+    PROCUREMENT_EQUIPMENT_ROUTINE = "Procurement - Equipment Routine"
+    PROCUREMENT_TRAINING_URGENT = "Procurement - Training Materials Urgent"
+    PROCUREMENT_TRAINING_SCHEDULED = "Procurement - Training Scheduled"
+    
+    # ===== TRAINING ACTIVITIES =====
+    TRAINING_EMERGENCY_SKILLS = "Emergency Skills Refresher"
+    TRAINING_NEW_STAFF = "New Staff Onboarding"
+    TRAINING_CERTIFICATION = "Certification Issuance"
+    TRAINING_REPORT = "Training Report Submission"
+    TRAINING_MATERIALS_DEV = "Training Materials Development"
+    TRAINING_SIMULATION = "Simulation/Drills Planning"
+    
+    # ===== ADMIN ACTIVITIES =====
+    ADMIN_OFFICE_SUPPLY = "Office Supply Issuance"
+    ADMIN_FACILITY_REPAIR = "Office Repairs & Facility Issues"
+    ADMIN_TRANSPORT = "Transport Arrangement"
+    ADMIN_VISITOR = "Visitor Management"
+    ADMIN_DOCUMENT = "Document Handling"
+    ADMIN_UNIFORM = "Uniform Issuance"
+    ADMIN_WELFARE = "Staff Welfare Support"
+    
+    # ===== GENERAL/OTHER =====
+    GENERAL_OTHER = "General - Other"
+
+
 class WorkflowStep(str, enum.Enum):
     SUBMITTED = "SUBMITTED"
     APPROVAL_PENDING = "APPROVAL_PENDING"
@@ -151,6 +244,36 @@ class SubDepartment(Base):
     requests_to = relationship("Request", foreign_keys="Request.assigned_subdepartment_id", back_populates="assigned_subdepartment")
 
 
+class SLAPolicy(Base):
+    """SLA Policy definitions for activity-specific response and completion times"""
+    __tablename__ = "sla_policies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Organizational scope (nullable = applies to all)
+    division_id = Column(Integer, ForeignKey("divisions.id"), nullable=True, index=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True, index=True)
+    
+    # Request categorization
+    resource_type = Column(SQLEnum(ResourceType), nullable=False, index=True)
+    activity_type = Column(SQLEnum(ActivityType), nullable=True, index=True)  # NULL = applies to all activities of resource_type
+    priority = Column(SQLEnum(Priority), nullable=False, index=True)
+    
+    # SLA timings (in hours)
+    response_time_hours = Column(Float, nullable=False)  # Expected response time
+    completion_time_hours = Column(Float, nullable=False)  # Expected completion time
+    
+    # Metadata
+    description = Column(Text)  # Human-readable description
+    is_active = Column(Boolean, default=True, nullable=False)  # Can be disabled without deleting
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    division = relationship("Division", foreign_keys=[division_id])
+    department = relationship("Department", foreign_keys=[department_id])
+
+
 class RequestActivityLog(Base):
     __tablename__ = "request_activity_logs"
 
@@ -180,6 +303,7 @@ class Request(Base):
     request_id = Column(String(100), unique=True, nullable=False, index=True)  # REQ-DEPT-DATE-XXX
     request_type = Column(String(100), nullable=False)  # HR, FINANCE, ICT, etc.
     resource_type = Column(SQLEnum(ResourceType), default=ResourceType.GENERAL)  # Type of shared resource
+    activity_type = Column(SQLEnum(ActivityType), nullable=True, index=True)  # Specific activity for SLA policy lookup
     
     # Requester info
     requester_id = Column(Integer, ForeignKey("users.id"), nullable=False)

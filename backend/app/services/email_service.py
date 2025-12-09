@@ -32,23 +32,34 @@ class EmailService:
             return False
     
     @staticmethod
-    def send_high_priority_notification(
+    def send_request_notification(
         db: Session,
         request: Request,
         assigned_users: List[User]
     ) -> bool:
         """
-        Send email notification for HIGH priority request
+        Send email notification for a new request (any priority)
         
         Returns True if email sent successfully, False otherwise
         """
-        # Check if emails are enabled
+        # Check if email notifications are enabled globally
         if not EmailService.is_email_enabled(db):
             logger.info("Email notifications are disabled in system settings")
             return False
         
-        # Check if SMTP is configured
-        if not settings.SMTP_HOST or not settings.SMTP_USERNAME:
+        # Fetch SMTP settings from DB
+        smtp_host_setting = db.query(SystemSettings).filter(SystemSettings.setting_key == "smtp_host").first()
+        smtp_port_setting = db.query(SystemSettings).filter(SystemSettings.setting_key == "smtp_port").first()
+        smtp_user_setting = db.query(SystemSettings).filter(SystemSettings.setting_key == "smtp_email").first()
+        smtp_pass_setting = db.query(SystemSettings).filter(SystemSettings.setting_key == "smtp_password").first()
+        
+        # Use DB settings or fallback to env vars
+        smtp_host = smtp_host_setting.setting_value if smtp_host_setting else settings.SMTP_HOST
+        smtp_port = int(smtp_port_setting.setting_value) if smtp_port_setting else settings.SMTP_PORT
+        smtp_user = smtp_user_setting.setting_value if smtp_user_setting else settings.SMTP_USERNAME
+        smtp_pass = smtp_pass_setting.setting_value if smtp_pass_setting else settings.SMTP_PASSWORD
+        
+        if not smtp_host or not smtp_user:
             logger.warning("SMTP not configured, skipping email")
             return False
         
@@ -61,11 +72,12 @@ class EmailService:
                 return False
             
             # Create email content
-            subject = f"🚨 HIGH PRIORITY Request - {request.request_id}"
+            priority_emoji = "🔴" if request.priority == "HIGH" else "🟡" if request.priority == "MEDIUM" else "🟢"
+            subject = f"{priority_emoji} {request.priority} PRIORITY Request - {request.request_id}"
             html_body = EmailService._create_email_html(request)
             
             # Send email
-            return EmailService._send_email(recipients, subject, html_body)
+            return EmailService._send_email(recipients, subject, html_body, smtp_host, smtp_port, smtp_user, smtp_pass)
             
         except Exception as e:
             logger.error(f"Failed to send email notification: {e}")
@@ -89,6 +101,9 @@ class EmailService:
         # Create request link
         request_link = f"{settings.FRONTEND_URL}/requests/{request.id}"
         
+        priority_color = "#ef4444" if request.priority == "HIGH" else "#f59e0b" if request.priority == "MEDIUM" else "#10b981"
+        priority_emoji = "🔴" if request.priority == "HIGH" else "🟡" if request.priority == "MEDIUM" else "🟢"
+        
         html = f"""
 <!DOCTYPE html>
 <html>
@@ -99,7 +114,7 @@ class EmailService:
         .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
         .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
         .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
-        .details {{ background: white; padding: 20px; border-left: 4px solid #ef4444; margin: 20px 0; }}
+        .details {{ background: white; padding: 20px; border-left: 4px solid {priority_color}; margin: 20px 0; }}
         .detail-row {{ display: flex; margin: 10px 0; }}
         .detail-label {{ font-weight: bold; min-width: 140px; }}
         .button {{ display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }}
@@ -109,8 +124,8 @@ class EmailService:
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚨 HIGH PRIORITY REQUEST</h1>
-            <p>A new urgent request has been assigned to {assigned_to}</p>
+            <h1>{priority_emoji} {request.priority} PRIORITY REQUEST</h1>
+            <p>A new request has been assigned to {assigned_to}</p>
         </div>
         
         <div class="content">
@@ -122,7 +137,7 @@ class EmailService:
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Priority:</span>
-                    <span style="color: #ef4444; font-weight: bold;">🔴 HIGH</span>
+                    <span style="color: {priority_color}; font-weight: bold;">{priority_emoji} {request.priority}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Type:</span>
@@ -148,7 +163,7 @@ class EmailService:
             </div>
             
             <p style="background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin-top: 20px;">
-                ⚠️ <strong>Action Required:</strong> This request requires immediate attention.
+                ⚠️ <strong>Action Required:</strong> Please review and acknowledge this request.
             </p>
         </div>
         
@@ -166,12 +181,20 @@ class EmailService:
         return html
     
     @staticmethod
-    def _send_email(recipients: List[str], subject: str, html_body: str) -> bool:
-        """Send email using SMTP"""
+    def _send_email(
+        recipients: List[str], 
+        subject: str, 
+        html_body: str,
+        smtp_host: str,
+        smtp_port: int,
+        smtp_user: str,
+        smtp_pass: str
+    ) -> bool:
+        """Send email using SMTP with provided credentials"""
         try:
             # Create message
             msg = MIMEMultipart('alternative')
-            msg['From'] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>"
+            msg['From'] = f"{settings.SMTP_FROM_NAME} <{smtp_user}>"
             msg['To'] = ", ".join(recipients)
             msg['Subject'] = subject
             
@@ -180,9 +203,9 @@ class EmailService:
             msg.attach(html_part)
             
             # Connect to SMTP server
-            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
                 server.starttls()  # Enable TLS
-                server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+                server.login(smtp_user, smtp_pass)
                 server.send_message(msg)
             
             logger.info(f"Email sent successfully to {len(recipients)} recipient(s)")
@@ -192,6 +215,9 @@ class EmailService:
             logger.error(f"SMTP error: {e}")
             return False
 
+
+# Global instance
+email_service = EmailService()
 
 # Global instance
 email_service = EmailService()

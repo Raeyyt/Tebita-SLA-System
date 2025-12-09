@@ -5,38 +5,47 @@ from sqlalchemy import func
 from datetime import datetime, timedelta
 
 from ..database import get_db
-from ..models import Request, SLAAlert, RequestStatus
+from ..auth import get_current_active_user
+from ..models import Request, SLAAlert, RequestStatus, User
 from .. import schemas
+from ..services.access_control import apply_role_based_filtering
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 
 @router.get("/stats", response_model=schemas.DashboardStats)
-def get_dashboard_stats(db: Session = Depends(get_db)):
+def get_dashboard_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Get dashboard statistics"""
     
+    # Base query with role-based filtering
+    base_query = db.query(Request)
+    base_query = apply_role_based_filtering(base_query, current_user)
+    
     # Total requests
-    total_requests = db.query(Request).count()
+    total_requests = base_query.count()
     
     # Pending approval
-    pending_approval = db.query(Request).filter(
+    pending_approval = base_query.filter(
         Request.status == RequestStatus.APPROVAL_PENDING
     ).count()
     
     # In progress
-    in_progress = db.query(Request).filter(
+    in_progress = base_query.filter(
         Request.status == RequestStatus.IN_PROGRESS
     ).count()
     
     # Completed
-    completed = db.query(Request).filter(
+    completed = base_query.filter(
         Request.status == RequestStatus.COMPLETED
     ).count()
     
     # Overdue requests (created more than SLA hours ago and not completed)
     now = datetime.now()
     overdue = 0
-    active_requests = db.query(Request).filter(
+    active_requests = base_query.filter(
         Request.status.in_([RequestStatus.PENDING, RequestStatus.APPROVAL_PENDING, RequestStatus.IN_PROGRESS])
     ).all()
     
@@ -48,7 +57,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
             overdue += 1
     
     # SLA compliance (percentage of requests completed within SLA)
-    completed_requests = db.query(Request).filter(
+    completed_requests = base_query.filter(
         Request.status == RequestStatus.COMPLETED,
         Request.completed_at.isnot(None)
     ).all()

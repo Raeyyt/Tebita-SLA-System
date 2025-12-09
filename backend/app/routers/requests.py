@@ -24,6 +24,7 @@ from ..models import (
 from .. import schemas
 from ..services.sla_calculator import calculate_deadlines  # NEW: Import SLA service
 from ..services.notification_service import send_user_notification
+from ..services.access_control import apply_role_based_filtering
 
 router = APIRouter(prefix="/requests", tags=["requests"])
 
@@ -66,27 +67,7 @@ async def get_requests(
     )
 
     # Role-based filtering
-    if current_user.role == "ADMIN":
-        # Admin sees ALL requests system-wide
-        pass
-    elif current_user.role == "DIVISION_MANAGER":
-        # Division managers see requests for their division
-        query = query.filter(
-            (Request.requester_division_id == current_user.division_id) |
-            (Request.assigned_division_id == current_user.division_id)
-        )
-    elif current_user.role == "DEPARTMENT_HEAD":
-        # Department heads see requests for their department
-        query = query.filter(
-            (Request.requester_department_id == current_user.department_id) |
-            (Request.assigned_department_id == current_user.department_id)
-        )
-    elif current_user.role == "SUB_DEPARTMENT_STAFF":
-        # Staff see requests they sent or received in their sub-department
-        query = query.filter(
-            (Request.requester_id == current_user.id) |
-            (Request.assigned_subdepartment_id == current_user.subdepartment_id)
-        )
+    query = apply_role_based_filtering(query, current_user)
 
     if status:
         query = query.filter(Request.status == status)
@@ -101,8 +82,13 @@ async def get_incoming_requests(
     current_user: User = Depends(get_current_active_user)
 ):
     """Requests assigned to the current user's department/division/user"""
-    if not current_user.department_id:
-        raise HTTPException(status_code=403, detail="Department membership required")
+    # Allow access if user has department OR division OR is Admin
+    is_admin = "ADMIN" in str(current_user.role)
+    has_dept = current_user.department_id is not None
+    has_div = current_user.division_id is not None
+    
+    if not has_dept and not has_div and not is_admin:
+        raise HTTPException(status_code=403, detail="Department or Division membership required")
 
     from sqlalchemy import or_, and_
     
@@ -111,20 +97,40 @@ async def get_incoming_requests(
         Request.assigned_to_user_id == current_user.id  # Directly assigned to user
     ]
     
-    # If user has subdepartment, show only subdepartment-specific requests
-    if current_user.subdepartment_id:
-        filters.append(Request.assigned_subdepartment_id == current_user.subdepartment_id)
-    else:
-        # If no subdepartment, show department-wide requests
-        # (but only those NOT assigned to a specific subdepartment)
+    # Role-specific "Incoming" logic
+    if current_user.role == UserRole.DIVISION_MANAGER:
+        # Show requests assigned directly to the Division (from any division)
+        filters.append(
+            and_(
+                Request.assigned_division_id == current_user.division_id,
+                Request.assigned_department_id.is_(None)
+            )
+        )
+    elif current_user.role == UserRole.DEPARTMENT_HEAD:
+        # Show requests assigned directly to the Department (from any department)
         filters.append(
             and_(
                 Request.assigned_department_id == current_user.department_id,
                 Request.assigned_subdepartment_id.is_(None)
             )
         )
+    elif current_user.subdepartment_id:
+        # Staff: Show requests assigned to their Sub-Department
+        filters.append(Request.assigned_subdepartment_id == current_user.subdepartment_id)
+    else:
+        # Fallback for staff without subdept (shouldn't happen ideally)
+        filters.append(Request.assigned_to_user_id == current_user.id)
+    
     
     query = db.query(Request).filter(or_(*filters))
+    
+    # Filter for active/pending requests AND completed ones (so they show up in the completed tab)
+    query = query.filter(Request.status.in_([
+        RequestStatus.PENDING, 
+        RequestStatus.IN_PROGRESS,
+        RequestStatus.COMPLETED
+    ]))
+    
     return query.order_by(Request.submitted_at.desc()).all()
 
 
@@ -149,6 +155,52 @@ async def create_request(
     current_user: User = Depends(get_current_active_user)
 ):
     """Create a new request with auto-calculated SLA deadlines"""
+    # 1. Restriction: Admins cannot create requests
+    if current_user.role == UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrators cannot create requests. Please use a standard user account."
+        )
+
+    # 2. Restriction: Self-requests (sending to own unit)
+    # Only block if sending to the EXACT SAME organizational level
+    
+    # Check if sending to same division
+    if request_in.assigned_division_id == current_user.division_id:
+        # Check if sending to same department (both must be non-None to compare)
+        if (request_in.assigned_department_id is not None and 
+            current_user.department_id is not None and
+            request_in.assigned_department_id == current_user.department_id):
+            
+            # Check Sub-Department level (if applicable)
+            # If user has subdept, and request is to same subdept -> BLOCK
+            if (current_user.subdepartment_id is not None and
+                request_in.assigned_subdepartment_id is not None and
+                request_in.assigned_subdepartment_id == current_user.subdepartment_id):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="You cannot send a request to your own Sub-Department."
+                )
+            
+            # If user has NO subdept (Dept Head), and request is to same Dept (and no specific subdept) -> BLOCK
+            # (Sending to a specific subdept within own Dept is allowed for Dept Heads)
+            if (current_user.subdepartment_id is None and 
+                request_in.assigned_subdepartment_id is None):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="You cannot send a request to your own Department."
+                )
+        
+        # If sending to same division but NO department specified (division-level request)
+        # And user is a Division Manager (has no dept) -> BLOCK
+        elif (request_in.assigned_department_id is None and 
+              current_user.department_id is None and
+              current_user.role == UserRole.DIVISION_MANAGER):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You cannot send a request to your own Division."
+            )
+
     # Generate request ID
     request_id = generate_request_id(db, request_in.request_type)
     
@@ -162,8 +214,8 @@ async def create_request(
         submitted_at=datetime.utcnow()
     )
     
-    # Calculate SLA deadlines
-    calculate_deadlines(request)
+    # Calculate SLA deadlines using policy-based system
+    calculate_deadlines(request, db)
     
     db.add(request)
     db.flush()  # Get request.id without committing
@@ -203,42 +255,42 @@ async def create_request(
         pass
     
     # Send email notification for HIGH priority requests
-    if request.priority == "HIGH":
-        try:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"Attempting to send email for HIGH priority request {request.request_id}")
-            
-            from ..services.email_service import email_service
-            
-            # Get assigned users
-            assigned_users = []
-            if request.assigned_to_user_id:
-                assigned_user = db.get(User, request.assigned_to_user_id)
-                if assigned_user:
-                    assigned_users.append(assigned_user)
-            elif request.assigned_subdepartment_id:
-                # Get all users in subdepartment  
-                assigned_users = db.query(User).filter(
-                    User.subdepartment_id == request.assigned_subdepartment_id
-                ).all()
-            elif request.assigned_department_id:
-                # Get department head
-                assigned_users = db.query(User).filter(
-                    User.department_id == request.assigned_department_id,
-                    User.role.in_([UserRole.DEPARTMENT_HEAD, UserRole.DIVISION_MANAGER])
-                ).all()
-            
-            if assigned_users:
-                logger.info(f"Found {len(assigned_users)} assigned users, sending email...")
-                email_service.send_high_priority_notification(db, request, assigned_users)
-            else:
-                logger.warning(f"No assigned users found for request {request.request_id}")
-        except Exception as e:
-            # Non-fatal: email failures shouldn't break request creation
-            import traceback
-            print(f"⚠️ Email notification failed (non-blocking): {e}")
-            print(traceback.format_exc())
+    # Send email notification (for all priorities)
+    try:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Attempting to send email for request {request.request_id}")
+        
+        from ..services.email_service import email_service
+        
+        # Get assigned users
+        assigned_users = []
+        if request.assigned_to_user_id:
+            assigned_user = db.get(User, request.assigned_to_user_id)
+            if assigned_user:
+                assigned_users.append(assigned_user)
+        elif request.assigned_subdepartment_id:
+            # Get all users in subdepartment  
+            assigned_users = db.query(User).filter(
+                User.subdepartment_id == request.assigned_subdepartment_id
+            ).all()
+        elif request.assigned_department_id:
+            # Get department head
+            assigned_users = db.query(User).filter(
+                User.department_id == request.assigned_department_id,
+                User.role.in_([UserRole.DEPARTMENT_HEAD, UserRole.DIVISION_MANAGER])
+            ).all()
+        
+        if assigned_users:
+            logger.info(f"Found {len(assigned_users)} assigned users, sending email...")
+            email_service.send_request_notification(db, request, assigned_users)
+        else:
+            logger.warning(f"No assigned users found for request {request.request_id}")
+    except Exception as e:
+        # Non-fatal: email failures shouldn't break request creation
+        import traceback
+        print(f"⚠️ Email notification failed (non-blocking): {e}")
+        print(traceback.format_exc())
     
     return request
 
@@ -461,17 +513,44 @@ async def get_request(
     if not request:
         raise HTTPException(status_code=404, detail="Request not found")
     
-    # Check access permissions
-    if current_user.department_id is None:
-        raise HTTPException(status_code=403, detail="Department membership required")
-
-    if not (
-        (request.requester_department_id and request.requester_department_id == current_user.department_id) or
-        (request.assigned_department_id and request.assigned_department_id == current_user.department_id) or
-        request.assigned_to_user_id == current_user.id or
-        request.requester_id == current_user.id
-    ):
-        raise HTTPException(status_code=403, detail="Not authorized")
+    # Check access permissions - user can view if they are:
+    # 1. The requester (created the request)
+    # 2. Assigned to the request (personally)
+    # 3. In the requester's organizational hierarchy (division/department/subdepartment)
+    # 4. In the assigned organizational hierarchy (division/department/subdepartment)
+    
+    is_requester = request.requester_id == current_user.id
+    is_assigned_user = request.assigned_to_user_id == current_user.id
+    
+    # Check if user is in requester's hierarchy
+    in_requester_division = (request.requester_division_id and 
+                             current_user.division_id and
+                             request.requester_division_id == current_user.division_id)
+    in_requester_department = (request.requester_department_id and 
+                               current_user.department_id and
+                               request.requester_department_id == current_user.department_id)
+    in_requester_subdepartment = (request.requester_subdepartment_id and 
+                                  current_user.subdepartment_id and
+                                  request.requester_subdepartment_id == current_user.subdepartment_id)
+    
+    # Check if user is in assigned hierarchy
+    in_assigned_division = (request.assigned_division_id and 
+                           current_user.division_id and
+                           request.assigned_division_id == current_user.division_id)
+    in_assigned_department = (request.assigned_department_id and 
+                             current_user.department_id and
+                             request.assigned_department_id == current_user.department_id)
+    in_assigned_subdepartment = (request.assigned_subdepartment_id and 
+                                current_user.subdepartment_id and
+                                request.assigned_subdepartment_id == current_user.subdepartment_id)
+    
+    has_access = (is_requester or is_assigned_user or 
+                 in_requester_division or in_requester_department or in_requester_subdepartment or
+                 in_assigned_division or in_assigned_department or in_assigned_subdepartment or
+                 current_user.role == UserRole.ADMIN)
+    
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Not authorized to view this request")
     
     return request
 

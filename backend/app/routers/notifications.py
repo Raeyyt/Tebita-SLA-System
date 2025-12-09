@@ -23,18 +23,20 @@ async def get_unread_count(
             Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS])
         ).count()
     elif current_user.role == "DIVISION_MANAGER":
-        # Division managers see pending requests in their division
+        # Division managers see pending requests assigned DIRECTLY to their division
         count = db.query(Request).filter(
             and_(
                 Request.assigned_division_id == current_user.division_id,
+                Request.assigned_department_id.is_(None),
                 Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS])
             )
         ).count()
     elif current_user.role == "DEPARTMENT_HEAD":
-        # Department heads see pending requests in their department
+        # Department heads see pending requests assigned DIRECTLY to their department
         count = db.query(Request).filter(
             and_(
                 Request.assigned_department_id == current_user.department_id,
+                Request.assigned_subdepartment_id.is_(None),
                 Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS])
             )
         ).count()

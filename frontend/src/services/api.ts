@@ -22,6 +22,28 @@ const withAuth = (token: string | null) => ({
     headers: { Authorization: `Bearer ${token}` },
 });
 
+export interface CreateRequestData {
+    request_type: string;
+    resource_type?: string;
+    requester_division_id: number;
+    requester_department_id?: number;
+    requester_subdepartment_id?: number;
+    assigned_division_id?: number;
+    assigned_department_id?: number;
+    assigned_subdepartment_id?: number;
+    priority: 'HIGH' | 'MEDIUM' | 'LOW';
+    description: string;
+    notes?: string;
+    sla_response_time_hours?: number;
+    sla_completion_time_hours?: number;
+    items: RequestItem[];
+    attachments?: Array<{
+        attachment_filename: string;
+        attachment_path: string;
+        attachment_type: string;
+    }>;
+}
+
 export const api = {
     // Authentication
     login: async (username: string, password: string) => {
@@ -125,22 +147,7 @@ export const api = {
 
     createRequest: async (
         token: string,
-        data: {
-            request_type: string;
-            resource_type?: string;
-            requester_division_id: number;
-            requester_department_id?: number;
-            requester_subdepartment_id?: number;
-            assigned_division_id?: number;
-            assigned_department_id?: number;
-            assigned_subdepartment_id?: number;
-            priority: 'HIGH' | 'MEDIUM' | 'LOW';
-            description: string;
-            notes?: string;
-            sla_response_time_hours?: number;
-            sla_completion_time_hours?: number;
-            items: RequestItem[];
-        }
+        data: CreateRequestData
     ): Promise<Request> => {
         const response = await client.post<Request>('/requests', data, withAuth(token));
         return response.data;
@@ -179,17 +186,16 @@ export const api = {
             path: string;
             type: string;
             size: number;
-        }>('/uploads/item-file', formData, {
+        }>('/api/uploads/item-file', formData, {
             headers: {
                 ...withAuth(token).headers,
-                'Content-Type': 'multipart/form-data',
             },
         });
         return response.data;
     },
 
     downloadItemFile: async (token: string, filename: string) => {
-        const response = await client.get(`/uploads/item-file/${filename}`, {
+        const response = await client.get(`/api/uploads/item-file/${filename}`, {
             ...withAuth(token),
             responseType: 'blob',
         });
@@ -266,7 +272,6 @@ export const api = {
         return response.data;
     },
 
-    // Admin users management
     // Admin users management
     getUsers: async (token: string) => {
         const response = await client.get('/users', withAuth(token));
@@ -373,6 +378,11 @@ export const api = {
 
 
     // Organization structure management
+    createDivision: async (token: string, data: { name: string; type: string; description?: string }): Promise<Division> => {
+        const response = await client.post<Division>('/divisions', data, withAuth(token));
+        return response.data;
+    },
+
     createDepartment: async (token: string, data: { name: string; division_id: number; description?: string }): Promise<Department> => {
         const response = await client.post<Department>('/departments', data, withAuth(token));
         return response.data;
@@ -382,6 +392,7 @@ export const api = {
         const response = await client.post<SubDepartment>(`/departments/${departmentId}/subdepartments`, data, withAuth(token));
         return response.data;
     },
+
     getRealTimeKPIs: async (token: string, departmentId?: number) => {
         const params = departmentId ? { department_id: departmentId } : {};
         const response = await client.get('/kpis/realtime', { ...withAuth(token), params });
@@ -449,6 +460,16 @@ export const api = {
 
     updateEmailNotifications: async (token: string, enabled: boolean) => {
         const response = await client.put(`/settings/email-notifications?enabled=${enabled}`, {}, withAuth(token));
+        return response.data;
+    },
+
+    updateSmtpSettings: async (token: string, config: any) => {
+        const response = await client.put('/settings/smtp-config', config, withAuth(token));
+        return response.data;
+    },
+
+    testSystemHealth: async (token: string) => {
+        const response = await client.get('/settings/health-check', withAuth(token));
         return response.data;
     },
 };

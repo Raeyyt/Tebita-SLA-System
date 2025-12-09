@@ -8,6 +8,19 @@ export const SystemSettingsPage = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
+    // SMTP State
+    const [smtpConfig, setSmtpConfig] = useState({
+        smtp_email: '',
+        smtp_password: '',
+        smtp_host: 'smtp.gmail.com',
+        smtp_port: '587'
+    });
+    const [showSmtpForm, setShowSmtpForm] = useState(false);
+
+    // Health Check State
+    const [healthStatus, setHealthStatus] = useState<any>(null);
+    const [testingSystem, setTestingSystem] = useState(false);
+
     useEffect(() => {
         const loadSettings = async () => {
             if (!token) return;
@@ -15,6 +28,10 @@ export const SystemSettingsPage = () => {
             try {
                 const status = await api.getEmailNotificationStatus(token);
                 setEmailEnabled(status.enabled);
+
+                // Note: We don't load existing SMTP password for security, 
+                // but we could load other fields if the API supported it.
+                // For now, we start blank or with defaults.
             } catch (err) {
                 console.error('Failed to load settings:', err);
             } finally {
@@ -42,6 +59,60 @@ export const SystemSettingsPage = () => {
         }
     };
 
+    const handleSmtpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setSmtpConfig({
+            ...smtpConfig,
+            [e.target.name]: e.target.value
+        });
+    };
+
+    const handleSaveSmtp = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!token) return;
+
+        setSaving(true);
+        try {
+            await api.updateSmtpSettings(token, smtpConfig);
+            alert('SMTP settings saved successfully!');
+            setShowSmtpForm(false);
+        } catch (err) {
+            console.error('Failed to save SMTP settings:', err);
+            alert('Failed to save SMTP settings');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleTestSystem = async () => {
+        if (!token) return;
+
+        setTestingSystem(true);
+        setHealthStatus(null);
+        try {
+            const result = await api.testSystemHealth(token);
+            setHealthStatus(result);
+        } catch (err) {
+            console.error('System health check failed:', err);
+            alert('System health check failed');
+        } finally {
+            setTestingSystem(false);
+        }
+    };
+
+    const downloadHealthReport = () => {
+        if (!healthStatus) return;
+
+        const report = JSON.stringify(healthStatus, null, 2);
+        const blob = new Blob([report], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `system_health_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     if (user?.role !== 'ADMIN') {
         return (
             <div style={{ padding: '2rem' }}>
@@ -57,15 +128,7 @@ export const SystemSettingsPage = () => {
     }
 
     if (loading) {
-        return (
-            <div style={{ padding: '2rem' }}>
-                <div className="card">
-                    <div style={{ padding: '3rem', textAlign: 'center' }}>
-                        Loading settings...
-                    </div>
-                </div>
-            </div>
-        );
+        return <div className="spinner"></div>;
     }
 
     return (
@@ -75,7 +138,63 @@ export const SystemSettingsPage = () => {
                     <h1 className="card-title">System Settings</h1>
                     <p className="text-muted">Configure system-wide features and preferences</p>
                 </div>
+                <button
+                    onClick={handleTestSystem}
+                    disabled={testingSystem}
+                    className="btn btn-primary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                    {testingSystem ? 'Testing...' : 'Test System Health'}
+                </button>
             </div>
+
+            {/* Health Check Results */}
+            {healthStatus && (
+                <div className="card" style={{ marginBottom: '2rem', borderLeft: `4px solid ${healthStatus.status === 'healthy' ? '#10b981' : '#ef4444'}` }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <h3 style={{ margin: 0 }}>System Health Report</h3>
+                        <button onClick={downloadHealthReport} className="btn btn-outline">
+                            Download Report
+                        </button>
+                    </div>
+                    <div style={{ marginBottom: '1rem' }}>
+                        <strong>Status: </strong>
+                        <span style={{
+                            color: healthStatus.status === 'healthy' ? '#10b981' : '#ef4444',
+                            fontWeight: 'bold',
+                            textTransform: 'uppercase'
+                        }}>
+                            {healthStatus.status}
+                        </span>
+                        <span style={{ marginLeft: '1rem', color: '#666', fontSize: '0.9rem' }}>
+                            {new Date(healthStatus.timestamp).toLocaleString()}
+                        </span>
+                    </div>
+                    <div style={{ display: 'grid', gap: '0.5rem' }}>
+                        {healthStatus.checks.map((check: any, index: number) => (
+                            <div key={index} style={{
+                                padding: '0.75rem',
+                                background: '#f8f9fa',
+                                borderRadius: '6px',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                            }}>
+                                <span>{check.name}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    <span style={{ fontSize: '0.9rem', color: '#666' }}>{check.details}</span>
+                                    <span style={{
+                                        fontWeight: 'bold',
+                                        color: check.status === 'PASS' ? '#10b981' : check.status === 'WARNING' ? '#f59e0b' : '#ef4444'
+                                    }}>
+                                        {check.status}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <div className="card">
                 <div className="card-header">
@@ -94,10 +213,10 @@ export const SystemSettingsPage = () => {
                     }}>
                         <div>
                             <div style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                                HIGH Priority Email Alerts
+                                All Requests Alert
                             </div>
                             <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                                Send email notifications when HIGH priority requests are created.
+                                Send email notifications for ALL new requests (High, Medium, Low).
                                 Emails are sent to assigned department users.
                             </div>
                         </div>
@@ -126,24 +245,87 @@ export const SystemSettingsPage = () => {
                     </div>
 
                     {emailEnabled && (
-                        <div style={{
-                            marginTop: '1.5rem',
-                            padding: '1rem',
-                            background: '#fff3cd',
-                            border: '1px solid #ffc107',
-                            borderRadius: '8px'
-                        }}>
-                            <div style={{ fontWeight: '600', marginBottom: '0.5rem', color: '#856404' }}>
-                                Configuration Required
-                            </div>
-                            <div style={{ fontSize: '0.875rem', color: '#856404' }}>
-                                Make sure SMTP settings are configured in the backend .env file:
-                                <ul style={{ marginTop: '0.5rem', marginLeft: '1.5rem' }}>
-                                    <li>SMTP_USERNAME</li>
-                                    <li>SMTP_PASSWORD</li>
-                                    <li>SMTP_HOST (default: smtp.gmail.com)</li>
-                                </ul>
-                            </div>
+                        <div style={{ marginTop: '2rem' }}>
+                            <button
+                                onClick={() => setShowSmtpForm(!showSmtpForm)}
+                                className="btn btn-outline"
+                                style={{ marginBottom: '1rem' }}
+                            >
+                                {showSmtpForm ? 'Hide Configuration' : 'Configure SMTP Settings'}
+                            </button>
+
+                            {showSmtpForm && (
+                                <form onSubmit={handleSaveSmtp} style={{
+                                    padding: '1.5rem',
+                                    background: '#f8f9fa',
+                                    borderRadius: '8px',
+                                    border: '1px solid #e9ecef'
+                                }}>
+                                    <h3 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.1rem' }}>SMTP Configuration</h3>
+
+                                    <div className="form-group">
+                                        <label>Sender Email</label>
+                                        <input
+                                            type="email"
+                                            name="smtp_email"
+                                            value={smtpConfig.smtp_email}
+                                            onChange={handleSmtpChange}
+                                            className="form-control"
+                                            placeholder="e.g., notifications@tebita.com"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>App Password</label>
+                                        <input
+                                            type="password"
+                                            name="smtp_password"
+                                            value={smtpConfig.smtp_password}
+                                            onChange={handleSmtpChange}
+                                            className="form-control"
+                                            placeholder="Enter app password"
+                                            required
+                                        />
+                                        <small className="text-muted">
+                                            For Gmail, use an App Password, not your login password.
+                                        </small>
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
+                                        <div className="form-group">
+                                            <label>SMTP Host</label>
+                                            <input
+                                                type="text"
+                                                name="smtp_host"
+                                                value={smtpConfig.smtp_host}
+                                                onChange={handleSmtpChange}
+                                                className="form-control"
+                                                placeholder="smtp.gmail.com"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Port</label>
+                                            <input
+                                                type="text"
+                                                name="smtp_port"
+                                                value={smtpConfig.smtp_port}
+                                                onChange={handleSmtpChange}
+                                                className="form-control"
+                                                placeholder="587"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
+                                        <button type="submit" className="btn btn-primary" disabled={saving}>
+                                            {saving ? 'Saving...' : 'Save Configuration'}
+                                        </button>
+                                    </div>
+                                </form>
+                            )}
                         </div>
                     )}
                 </div>

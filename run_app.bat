@@ -4,16 +4,15 @@ echo   Tebita SLA System - One-Click Start
 echo ==========================================
 
 cd backend
-if not exist .venv (
-    echo Creating Python virtual environment...
-    python -m venv .venv
+echo Checking for UV...
+python -m uv --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Installing UV...
+    pip install uv
 )
 
-echo Activating virtual environment...
-call .venv\Scripts\activate
-
-echo Installing dependencies...
-pip install -r requirements.txt
+echo Syncing dependencies with UV...
+call python -m uv sync
 
 if not exist .env (
     echo Creating .env file for SQLite...
@@ -23,10 +22,10 @@ if not exist .env (
 )
 
 echo Initializing Database...
-python init_db.py
+call python -m uv run python init_db.py
 
 echo Starting Backend Server...
-start "Tebita Backend" python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
+start "Tebita Backend" python -m uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 
 cd ..\frontend
 echo Installing Frontend dependencies...

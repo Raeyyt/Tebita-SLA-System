@@ -1,0 +1,28 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "gunicorn",
+    "sqlalchemy",
+    "psycopg2-binary",
+    "python-jose[cryptography]",
+    "passlib[bcrypt]",
+    "python-multipart",
+    "pydantic",
+    "pydantic-settings",
+    "celery",
+    "redis",
+    "python-dotenv",
+    "alembic",
+    "reportlab",
+    "openpyxl",
+    "twilio",
+    "email-validator",
+    "APScheduler",
+    "httpx",
+]

@@ -248,7 +248,14 @@ export const RequestViewPage = () => {
     const loadPdf = async (requestId: number) => {
         if (!token) return;
         try {
-            const API_BASE = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8001';
+            // Use the same API_BASE logic as api.ts
+            const getApiUrl = () => {
+                if (import.meta.env.VITE_API_URL) {
+                    return import.meta.env.VITE_API_URL;
+                }
+                return `http://${window.location.hostname}:8000`;
+            };
+            const API_BASE = getApiUrl();
             const url = `${API_BASE}/api/requests/${requestId}/pdf`;
 
             console.log('Loading PDF from:', url);
@@ -504,6 +511,64 @@ export const RequestViewPage = () => {
                         {request.description}
                     </div>
                 </div>
+
+                {/* Request Attachment */}
+                {request.attachments && request.attachments.length > 0 && (
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <h3 style={{
+                            fontSize: '0.95rem',
+                            fontWeight: '700',
+                            color: '#1B1717',
+                            marginBottom: '0.5rem'
+                        }}>
+                            ATTACHMENT
+                        </h3>
+                        {request.attachments.map((att: any, idx: number) => (
+                            <div key={idx} style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                fontSize: '0.9rem',
+                                color: '#495057'
+                            }}>
+                                <button
+                                    onClick={async () => {
+                                        if (token && att.attachment_path) {
+                                            try {
+                                                await api.downloadItemFile(token, att.attachment_path);
+                                            } catch (error) {
+                                                console.error('Error downloading file:', error);
+                                                alert('Failed to download file');
+                                            }
+                                        }
+                                    }}
+                                    style={{
+                                        background: '#3498db',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        padding: '0.4rem 0.8rem',
+                                        fontSize: '0.85rem',
+                                        fontWeight: '500',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        transition: 'background-color 0.2s'
+                                    }}
+                                    onMouseOver={(e) => e.currentTarget.style.background = '#2980b9'}
+                                    onMouseOut={(e) => e.currentTarget.style.background = '#3498db'}
+                                    title={att.attachment_filename} // Show filename on hover
+                                >
+                                    View Uploaded Document
+                                </button>
+                                <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>
+                                    {att.attachment_filename}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
 
                 {/* Priority Type */}
                 <div style={{ marginBottom: '1.5rem' }}>

@@ -12,8 +12,7 @@ import { SentRequestsPage } from './pages/SentRequestsPage';
 import { MEDashboardPage } from './pages/MEDashboardPage';
 import { SLAMonitorPage } from './pages/SLAMonitorPage';
 import { KPIsPage } from './pages/KPIsPage';
-import { ScorecardsPage } from './pages/ScorecardsPage';
-import { AnalyticsDashboardPage } from './pages/AnalyticsDashboardPage';
+
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import UserManagement from './pages/admin/UserManagement';
 import { DivisionDashboardPage } from './pages/DivisionDashboardPage';
@@ -21,6 +20,7 @@ import { DepartmentDashboardPage } from './pages/DepartmentDashboardPage';
 import { StaffDashboardPage } from './pages/StaffDashboardPage';
 import { DepartmentRatingsPage } from './pages/DepartmentRatingsPage';
 import { SystemSettingsPage } from './pages/SystemSettingsPage';
+import VisualAnalyticsPage from './pages/VisualAnalyticsPage';
 import './index.css';
 
 function App() {
@@ -51,8 +51,8 @@ function App() {
             <Route path="me-dashboard" element={<MEDashboardPage />} />
             <Route path="sla-monitor" element={<SLAMonitorPage />} />
             <Route path="kpis" element={<KPIsPage />} />
-            <Route path="scorecards" element={<ScorecardsPage />} />
-            <Route path="analytics" element={<AnalyticsDashboardPage />} />  {/* Phase 4: Comprehensive Analytics */}
+
+            <Route path="visual-analytics" element={<VisualAnalyticsPage />} />  {/* Visual Analytics Dashboard */}
             <Route path="ratings" element={<DepartmentRatingsPage />} />  {/* Department Ratings Analytics */}
             <Route path="settings" element={<SystemSettingsPage />} />  {/* System Settings */}
             <Route path="admin/users" element={<UserManagement />} />

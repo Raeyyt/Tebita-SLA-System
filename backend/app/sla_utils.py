@@ -1,15 +1,17 @@
 """
 SLA Utilities for Tebita M&E System
-Auto-calculates SLA deadlines and tracks compliance based on priority and resource type.
+Auto-calculates SLA deadlines and tracks compliance based on policy lookup.
+Now supports activity-specific SLA policies from database.
 """
 from datetime import datetime, timedelta
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 from decimal import Decimal
+from sqlalchemy.orm import Session
 
-from app.models import Priority, ResourceType, Request, RequestStatus
+from app.models import Priority, ResourceType, ActivityType, Request, RequestStatus, SLAPolicy
 
 
-# SLA Configuration based on organizational requirements
+# Legacy SLA Configuration (Fallback if no policy found)
 SLA_RESPONSE_HOURS = {
     Priority.HIGH: 4,      # 4 hours for high priority
     Priority.MEDIUM: 24,   # 24 hours for medium priority
@@ -26,6 +28,91 @@ SLA_COMPLETION_HOURS = {
     ResourceType.FACILITIES: 72,     # 3 days for facilities
     ResourceType.GENERAL: 96,        # 4 days for general requests
 }
+
+
+def get_sla_policy(
+    db: Session,
+    resource_type: ResourceType,
+    activity_type: Optional[ActivityType],
+    priority: Priority,
+    division_id: Optional[int] = None,
+    department_id: Optional[int] = None
+) -> Optional[SLAPolicy]:
+    """
+    Lookup SLA policy from database with cascading specificity.
+    
+    Lookup order (most specific to least specific):
+    1. Division + Department + Resource + Activity + Priority
+    2. Division + Resource + Activity + Priority
+    3. Resource + Activity + Priority
+    4. Resource + Priority (activity=NULL)
+    5. NULL (returns None, use fallback)
+    
+    Args:
+        db: Database session
+        resource_type: Type of resource
+        activity_type: Specific activity (can be None)
+        priority: Priority level
+        division_id: Optional division ID
+        department_id: Optional department ID
+        
+    Returns:
+        SLAPolicy object or None if no policy found
+    """
+    # Build query filters in order of specificity
+    query_attempts = []
+    
+    # Attempt 1: Most specific - Division + Department + Resource + Activity + Priority
+    if division_id and department_id and activity_type:
+        query_attempts.append([
+            SLAPolicy.division_id == division_id,
+            SLAPolicy.department_id == department_id,
+            SLAPolicy.resource_type == resource_type,
+            SLAPolicy.activity_type == activity_type,
+            SLAPolicy.priority == priority,
+            SLAPolicy.is_active == True
+        ])
+    
+    # Attempt 2: Division + Resource + Activity + Priority
+    if division_id and activity_type:
+        query_attempts.append([
+            SLAPolicy.division_id == division_id,
+            SLAPolicy.department_id.is_(None),
+            SLAPolicy.resource_type == resource_type,
+            SLAPolicy.activity_type == activity_type,
+            SLAPolicy.priority == priority,
+            SLAPolicy.is_active == True
+        ])
+    
+    # Attempt 3: Resource + Activity + Priority (global policy)
+    if activity_type:
+        query_attempts.append([
+            SLAPolicy.division_id.is_(None),
+            SLAPolicy.department_id.is_(None),
+            SLAPolicy.resource_type == resource_type,
+            SLAPolicy.activity_type == activity_type,
+            SLAPolicy.priority == priority,
+            SLAPolicy.is_active == True
+        ])
+    
+    # Attempt 4: Resource + Priority only (activity=NULL, global policy)
+    query_attempts.append([
+        SLAPolicy.division_id.is_(None),
+        SLAPolicy.department_id.is_(None),
+        SLAPolicy.resource_type == resource_type,
+        SLAPolicy.activity_type.is_(None),
+        SLAPolicy.priority == priority,
+        SLAPolicy.is_active == True
+    ])
+    
+    # Try each query in order, return first match
+    for filters in query_attempts:
+        policy = db.query(SLAPolicy).filter(*filters).first()
+        if policy:
+            return policy
+    
+    return None
+
 
 
 def calculate_sla_deadlines(
