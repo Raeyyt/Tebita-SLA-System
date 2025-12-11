@@ -19,7 +19,7 @@ async def get_sla_compliance(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get SLA compliance metrics"""
+    """Get SLA compliance metrics - INCLUDES active overdue requests"""
     # Calculate period start
     now = datetime.utcnow()
     if period == "day":
@@ -31,48 +31,62 @@ async def get_sla_compliance(
     else:  # month
         start = now - timedelta(days=30)
     
-    # Get completed requests in period
-    query = db.query(Request).filter(
-        Request.status == RequestStatus.COMPLETED,
-        Request.completed_at >= start
-    )
+    # Get all requests in period (not just completed)
+    query = db.query(Request).filter(Request.created_at >= start)
     query = apply_role_based_filtering(query, current_user)
-    completed_requests = query.all()
     
-    if not completed_requests:
-        return {
-            "total_requests": 0,
-            "within_sla": 0,
-            "overdue": 0,
-            "compliance_rate": 0,
-            "average_completion_time": 0,
-        }
+    # Get completed requests
+    completed_requests = query.filter(
+        Request.status == RequestStatus.COMPLETED,
+        Request.sla_completion_time_hours.isnot(None),
+        Request.created_at.isnot(None),
+        Request.actual_completion_time.isnot(None)
+    ).all()
     
-    # Calculate metrics
     within_sla = 0
+    overdue_completed = 0
     total_completion_time = 0
     
-    DEFAULT_SLA_HOURS = 24
-
-    for req in completed_requests:
-        if req.completed_at and req.created_at:
-            time_taken = (req.completed_at - req.created_at).total_seconds() / 3600
-            target_hours = req.sla_completion_time_hours or DEFAULT_SLA_HOURS
-            
-            if time_taken <= target_hours:
-                within_sla += 1
-            
-            total_completion_time += time_taken
+    DEFAULT_SLA_HOURS = 96
     
-    total = len(completed_requests)
-    overdue = total - within_sla
-    compliance_rate = (within_sla / total * 100) if total > 0 else 0
-    avg_time = total_completion_time / total if total > 0 else 0
+    # Check completed requests
+    for req in completed_requests:
+        target_hours = req.sla_completion_time_hours or DEFAULT_SLA_HOURS
+        deadline = req.created_at + timedelta(hours=target_hours)
+        
+        if req.actual_completion_time <= deadline:
+            within_sla += 1
+        else:
+            overdue_completed += 1
+        
+        if req.completed_at and req.created_at:
+            total_completion_time += (req.completed_at - req.created_at).total_seconds() / 3600
+    
+    # Get active overdue requests
+    active_requests = query.filter(
+        Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
+        Request.sla_completion_time_hours.isnot(None),
+        Request.created_at.isnot(None)
+    ).all()
+    
+    overdue_active = 0
+    for req in active_requests:
+        target_hours = req.sla_completion_time_hours or DEFAULT_SLA_HOURS
+        deadline = req.created_at + timedelta(hours=target_hours)
+        if now > deadline:
+            overdue_active += 1
+    
+    # Total calculations
+    total = len(completed_requests) + len(active_requests)
+    total_evaluated = within_sla + overdue_completed + overdue_active
+    total_overdue = overdue_completed + overdue_active
+    compliance_rate = (within_sla / total_evaluated * 100) if total_evaluated > 0 else 100
+    avg_time = total_completion_time / len(completed_requests) if completed_requests else 0
     
     return {
         "total_requests": total,
         "within_sla": within_sla,
-        "overdue": overdue,
+        "overdue": total_overdue,
         "compliance_rate": round(compliance_rate, 2),
         "average_completion_time": round(avg_time, 2),
         "period": period,

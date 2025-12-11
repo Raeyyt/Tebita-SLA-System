@@ -9,7 +9,7 @@ from ..database import get_db
 from ..auth import get_current_active_user
 from ..models import Request, User, Division, Department, RequestStatus, KPIMetric, Scorecard, ScoreRating
 from .. import schemas
-from ..services.kpi_calculator import calculate_kpi_metrics  # NEW: Import KPI service
+from ..services.kpi_calculator import calculate_kpi_metrics, calculate_overdue_requests  # NEW: Import KPI service
 from ..services.access_control import apply_role_based_filtering
 
 router = APIRouter(prefix="/kpis", tags=["kpis"])
@@ -42,7 +42,13 @@ async def get_realtime_kpis(
         # TODO: Validate user has access to this department
         department_id_filter = department_id
 
-    return calculate_kpi_metrics(db, department_id_filter, division_id_filter)
+    metrics = calculate_kpi_metrics(db, department_id_filter, division_id_filter)
+    overdue_count = calculate_overdue_requests(db, department_id_filter, division_id_filter)
+    
+    return {
+        **metrics,
+        "overdue_requests": overdue_count
+    }
 
 
 @router.get("/metrics")
@@ -196,17 +202,36 @@ async def get_kpi_dashboard(
     completion_times = []
     within_sla = 0
     
+    compliant = 0
+    non_compliant = 0
+    now = datetime.utcnow()
+    
+    # Check completed requests
     for req in requests:
         if req.status == RequestStatus.COMPLETED:
-            if req.created_at and req.completed_at:
+            if req.created_at and req.completed_at and req.sla_completion_time_hours:
                 completion_time = (req.completed_at - req.created_at).total_seconds() / 3600
                 completion_times.append(completion_time)
                 
-                if req.sla_completion_time_hours and completion_time <= req.sla_completion_time_hours:
-                    within_sla += 1
+                deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
+                if req.actual_completion_time and req.actual_completion_time <= deadline:
+                    compliant += 1
+                else:
+                    non_compliant += 1
     
+    # Check active overdue requests
+    overdue_active = 0
+    for req in requests:
+        if req.status in [RequestStatus.PENDING, RequestStatus.IN_PROGRESS]:
+            if req.created_at and req.sla_completion_time_hours:
+                deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
+                if now > deadline:
+                    overdue_active += 1
+    
+    # Calculate SLA rate with active overdue included
+    total_evaluated = compliant + non_compliant + overdue_active
+    sla_rate = (compliant / total_evaluated * 100) if total_evaluated > 0 else 100
     avg_completion = sum(completion_times) / len(completion_times) if completion_times else 0
-    sla_rate = (within_sla / len(completion_times) * 100) if completion_times else 0
     
     return {
         "total_requests": total,

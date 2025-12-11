@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, extract
 from app.models import Request, RequestStatus, Priority, FleetRequest, HRDeployment, FinanceTransaction, ICTTicket, LogisticsRequest, CustomerSatisfaction
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 def calculate_kpi_metrics(db: Session, department_id: int = None, division_id: int = None):
     """
@@ -23,15 +23,45 @@ def calculate_kpi_metrics(db: Session, department_id: int = None, division_id: i
             "pending_requests": 0
         }
 
-    # 1. SLA Resolution Compliance
-    # Count requests that are COMPLETED and actual_completion_time <= sla_completion_deadline
-    compliant_count = query.filter(
-        Request.status == RequestStatus.COMPLETED,
-        Request.actual_completion_time <= Request.sla_completion_deadline
-    ).count()
+    # 1. SLA Resolution Compliance (includes active overdue requests)
+    # FIXED: Calculate deadline from created_at + sla_completion_time_hours
     
-    completed_count = query.filter(Request.status == RequestStatus.COMPLETED).count()
-    compliance_rate = (compliant_count / completed_count * 100) if completed_count > 0 else 100
+    now = datetime.utcnow()  # Use timezone-naive to match created_at
+    
+    # Get all completed requests with SLA time defined
+    completed_requests = query.filter(
+        Request.status == RequestStatus.COMPLETED,
+        Request.sla_completion_time_hours.isnot(None),
+        Request.created_at.isnot(None),
+        Request.actual_completion_time.isnot(None)
+    ).all()
+    
+    compliant_completed = 0
+    non_compliant_completed = 0
+    
+    for req in completed_requests:
+        deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
+        if req.actual_completion_time <= deadline:
+            compliant_completed += 1
+        else:
+            non_compliant_completed += 1
+    
+    # Get active overdue requests
+    active_requests = query.filter(
+        Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
+        Request.sla_completion_time_hours.isnot(None),
+        Request.created_at.isnot(None)
+    ).all()
+    
+    overdue_active = 0
+    for req in active_requests:
+        deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
+        if now > deadline:
+            overdue_active += 1
+    
+    # Total requests to evaluate
+    total_evaluated = compliant_completed + non_compliant_completed + overdue_active
+    compliance_rate = (compliant_completed / total_evaluated * 100) if total_evaluated > 0 else 100
 
     # 2. Average Resolution Time
     # Avg of (actual_completion_time - created_at) for completed requests
@@ -182,3 +212,32 @@ def calculate_payment_accuracy(db: Session, start_date: datetime, end_date: date
     
     accurate = query.filter(FinanceTransaction.payment_accuracy == True).count()
     return (accurate / total) * 100.0
+
+def calculate_overdue_requests(db: Session, department_id: int = None, division_id: int = None):
+    """
+    Calculates count of requests that are currently overdue.
+    Includes active overdue requests (PENDING or IN_PROGRESS past their deadline).
+    FIXED: Calculate deadline from created_at + sla_completion_time_hours
+    """
+    query = db.query(Request)
+    if department_id:
+        query = query.filter(Request.assigned_department_id == department_id)
+    if division_id:
+        query = query.filter(Request.assigned_division_id == division_id)
+    
+    now = datetime.utcnow()  # Use timezone-naive to match created_at
+    
+    # Get active requests with SLA time defined
+    active_requests = query.filter(
+        Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
+        Request.sla_completion_time_hours.isnot(None),
+        Request.created_at.isnot(None)
+    ).all()
+    
+    overdue_count =0
+    for req in active_requests:
+        deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
+        if now > deadline:
+            overdue_count += 1
+    
+    return overdue_count

@@ -6,6 +6,7 @@ import logging
 from app.database import SessionLocal
 from app.models import Request, RequestStatus, SLAAlert, AlertType
 from app.services.sla_calculator import calculate_sla_status
+from app.services.backup_service import create_database_backup
 
 # Configure logging
 logging.basicConfig()
@@ -63,11 +64,34 @@ def _create_alert_if_not_exists(db: Session, request: Request, alert_type: Alert
         db.commit()
         print(f"⚠️ SLA Alert Created: {alert_type} for Request {request.request_id}")
 
+def database_backup_job():
+    """
+    Periodic job to backup the database.
+    Runs daily at 2:00 AM.
+    """
+    try:
+        create_database_backup()
+    except Exception as e:
+        print(f"❌ Error in database backup job: {e}")
+
 def start_scheduler():
     if not scheduler.running:
+        # SLA monitoring every 5 minutes
         scheduler.add_job(check_sla_status_job, 'interval', minutes=5)
+        
+        # Database backup daily at 2:00 AM
+        scheduler.add_job(
+            database_backup_job, 
+            'cron', 
+            hour=2, 
+            minute=0,
+            id='database_backup'
+        )
+        
         scheduler.start()
-        print("⏰ SLA Background Scheduler started (Interval: 5 mins)")
+        print("⏰ Background Scheduler started:")
+        print("   - SLA Monitoring: Every 5 minutes")
+        print("   - Database Backup: Daily at 2:00 AM")
 
 def stop_scheduler():
     if scheduler.running:

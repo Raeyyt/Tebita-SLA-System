@@ -472,4 +472,9 @@ export const api = {
         const response = await client.get('/settings/health-check', withAuth(token));
         return response.data;
     },
+
+    resetSystemData: async (token: string) => {
+        const response = await client.delete('/settings/reset-data', withAuth(token));
+        return response.data;
+    },
 };

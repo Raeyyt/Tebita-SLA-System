@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 
 export const MEDashboardPage = () => {
     const { token, user } = useAuth();
+    const navigate = useNavigate();
     const [dashboard, setDashboard] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [downloading, setDownloading] = useState(false);
@@ -34,7 +36,7 @@ export const MEDashboardPage = () => {
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `request_activity_logs_${new Date().toISOString().slice(0,19).replace(/[-:T]/g, '')}.csv`;
+            link.download = `request_activity_logs_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}.csv`;
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -76,25 +78,25 @@ export const MEDashboardPage = () => {
 
             {/* Key Metrics */}
             <div className="grid grid-4">
-                <div className="stat-card">
+                <div className="stat-card clickable" onClick={() => navigate('/requests')} style={{ cursor: 'pointer' }}>
                     <div className="stat-label">Total Requests</div>
                     <div className="stat-value">{dashboard.total_requests}</div>
                     <div className="stat-change">All time</div>
                 </div>
 
-                <div className="stat-card light">
+                <div className="stat-card light clickable" onClick={() => navigate('/sla-monitor')} style={{ cursor: 'pointer' }}>
                     <div className="stat-label">SLA Compliance</div>
                     <div className="stat-value">{dashboard.sla_compliance_month}%</div>
                     <div className="stat-change">This month</div>
                 </div>
 
-                <div className="stat-card light">
+                <div className="stat-card light clickable" onClick={() => navigate('/sla-monitor')} style={{ cursor: 'pointer' }}>
                     <div className="stat-label">Overdue Requests</div>
                     <div className="stat-value">{dashboard.overdue_requests}</div>
                     <div className="stat-change negative">Requires attention</div>
                 </div>
 
-                <div className="stat-card light">
+                <div className="stat-card light clickable" onClick={() => navigate('/requests', { state: { filter: 'COMPLETED' } })} style={{ cursor: 'pointer' }}>
                     <div className="stat-label">Completed Today</div>
                     <div className="stat-value">{dashboard.today.completed}</div>
                     <div className="stat-change">{dashboard.today.submitted} submitted</div>
@@ -107,25 +109,25 @@ export const MEDashboardPage = () => {
                     <h2 className="card-title">Request Status Breakdown</h2>
                 </div>
                 <div className="grid grid-4">
-                    <div style={{ padding: '1rem', background: 'var(--gray-50)', borderRadius: 'var(--radius)' }}>
+                    <div onClick={() => navigate('/requests', { state: { filter: 'PENDING' } })} style={{ padding: '1rem', background: 'var(--gray-50)', borderRadius: 'var(--radius)', cursor: 'pointer', transition: 'transform 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}>
                         <div className="text-small text-muted">Pending</div>
                         <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--gray-700)' }}>
                             {dashboard.status_breakdown.pending}
                         </div>
                     </div>
-                    <div style={{ padding: '1rem', background: 'var(--gray-50)', borderRadius: 'var(--radius)' }}>
+                    <div onClick={() => navigate('/requests', { state: { filter: 'APPROVAL_PENDING' } })} style={{ padding: '1rem', background: 'var(--gray-50)', borderRadius: 'var(--radius)', cursor: 'pointer', transition: 'transform 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}>
                         <div className="text-small text-muted">Approval Pending</div>
                         <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--warning)' }}>
                             {dashboard.status_breakdown.approval_pending}
                         </div>
                     </div>
-                    <div style={{ padding: '1rem', background: 'var(--gray-50)', borderRadius: 'var(--radius)' }}>
+                    <div onClick={() => navigate('/requests', { state: { filter: 'IN_PROGRESS' } })} style={{ padding: '1rem', background: 'var(--gray-50)', borderRadius: 'var(--radius)', cursor: 'pointer', transition: 'transform 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}>
                         <div className="text-small text-muted">In Progress</div>
                         <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--info)' }}>
                             {dashboard.status_breakdown.in_progress}
                         </div>
                     </div>
-                    <div style={{ padding: '1rem', background: 'var(--gray-50)', borderRadius: 'var(--radius)' }}>
+                    <div onClick={() => navigate('/requests', { state: { filter: 'COMPLETED' } })} style={{ padding: '1rem', background: 'var(--gray-50)', borderRadius: 'var(--radius)', cursor: 'pointer', transition: 'transform 0.2s' }} onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}>
                         <div className="text-small text-muted">Completed</div>
                         <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--success)' }}>
                             {dashboard.status_breakdown.completed}

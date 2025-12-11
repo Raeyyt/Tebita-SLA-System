@@ -45,20 +45,45 @@ async def get_me_dashboard(
             Request.completed_at >= today_start
         )).count()
         
-        # SLA compliance (this month)
+        # SLA compliance (this month) - FIXED to calculate deadlines properly
+        # Uses created_at + sla_completion_time_hours instead of sla_completion_deadline
+        now = datetime.utcnow()  # Use timezone-naive to match created_at
+        
+        # Get completed requests this month with SLA time defined
         month_completed = filter_reqs(db.query(Request).filter(
             Request.status == RequestStatus.COMPLETED,
-            Request.completed_at >= month_start
+            Request.completed_at >= month_start,
+            Request.sla_completion_time_hours.isnot(None),
+            Request.created_at.isnot(None),
+            Request.actual_completion_time.isnot(None)
         )).all()
         
-        within_sla = 0
-        for req in month_completed:
-            if req.completed_at and req.created_at and req.sla_completion_time_hours:
-                time_taken = (req.completed_at - req.created_at).total_seconds() / 3600
-                if time_taken <= req.sla_completion_time_hours:
-                    within_sla += 1
+        within_sla_completed = 0
+        missed_sla_completed = 0
         
-        sla_compliance = (within_sla / len(month_completed) * 100) if month_completed else 0
+        for req in month_completed:
+            deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
+            if req.actual_completion_time <= deadline:
+                within_sla_completed += 1
+            else:
+                missed_sla_completed += 1
+        
+        # Get currently overdue active requests
+        active_requests = filter_reqs(db.query(Request).filter(
+            Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
+            Request.sla_completion_time_hours.isnot(None),
+            Request.created_at.isnot(None)
+        )).all()
+        
+        overdue_active = 0
+        for req in active_requests:
+            deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
+            if now > deadline:
+                overdue_active += 1
+        
+        # Total requests to evaluate
+        total_evaluated = within_sla_completed + missed_sla_completed + overdue_active
+        sla_compliance = (within_sla_completed / total_evaluated * 100) if total_evaluated > 0 else 100
         
         # Requests by division (counts)
         div_stats_query = db.query(
@@ -90,19 +115,18 @@ async def get_me_dashboard(
             for req in recent_requests
         ]
         
-        # Overdue requests
-        active_query = db.query(Request).filter(
-            Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVED]),
-            Request.sla_completion_time_hours.isnot(None)
-        )
-        active_requests = filter_reqs(active_query).all()
+        # Overdue requests - FIXED to calculate deadlines properly
+        active_requests = filter_reqs(db.query(Request).filter(
+            Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
+            Request.sla_completion_time_hours.isnot(None),
+            Request.created_at.isnot(None)
+        )).all()
         
         overdue_count = 0
         for req in active_requests:
-            if req.created_at and req.sla_completion_time_hours:
-                deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
-                if now > deadline:
-                    overdue_count += 1
+            deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
+            if now > deadline:
+                overdue_count += 1
         
         return {
             "total_requests": total_requests,

@@ -113,6 +113,23 @@ export const SystemSettingsPage = () => {
         document.body.removeChild(link);
     };
 
+    const handleResetData = async () => {
+        if (!token) return;
+
+        setSaving(true);
+        try {
+            const result = await api.resetSystemData(token);
+            alert(result.message || 'System data reset successfully.');
+            // Reload page to reflect changes (optional, but good practice)
+            window.location.reload();
+        } catch (err) {
+            console.error('Failed to reset system data:', err);
+            alert('Failed to reset system data. Check console for details.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     if (user?.role !== 'ADMIN') {
         return (
             <div style={{ padding: '2rem' }}>
@@ -328,6 +345,41 @@ export const SystemSettingsPage = () => {
                             )}
                         </div>
                     )}
+                </div>
+            </div>
+
+            {/* Danger Zone */}
+            <div className="card" style={{ marginTop: '2rem', borderColor: 'var(--error)' }}>
+                <div className="card-header" style={{ borderBottom: '1px solid var(--gray-200)' }}>
+                    <h2 className="card-title" style={{ color: 'var(--error)' }}>Danger Zone</h2>
+                </div>
+                <div style={{ padding: '2rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <h3 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem' }}>Reset System Data</h3>
+                            <p className="text-muted" style={{ maxWidth: '600px' }}>
+                                This action will permanently delete all requests, workflows, logs, alerts, and feedback data.
+                                Users, departments, and system settings will be preserved.
+                                <strong>This action cannot be undone.</strong>
+                            </p>
+                        </div>
+                        <button
+                            className="btn"
+                            style={{
+                                background: 'var(--error)',
+                                color: 'white',
+                                border: 'none',
+                                padding: '0.75rem 1.5rem'
+                            }}
+                            onClick={() => {
+                                if (window.confirm('ARE YOU SURE? This will delete ALL requests and related data permanently. This action cannot be undone.')) {
+                                    handleResetData();
+                                }
+                            }}
+                        >
+                            Reset Data
+                        </button>
+                    </div>
                 </div>
             </div>
 

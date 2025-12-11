@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 
 export const SLAMonitorPage = () => {
     const { token } = useAuth();
+    const navigate = useNavigate();
     const [dashboard, setDashboard] = useState<any>(null);
     const [compliance, setCompliance] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -41,25 +43,25 @@ export const SLAMonitorPage = () => {
             {/* SLA Status Cards */}
             {dashboard && (
                 <div className="grid grid-4">
-                    <div className="stat-card" style={{ background: 'linear-gradient(135deg, var(--success) 0%, #059669 100%)' }}>
+                    <div className="stat-card clickable" onClick={() => navigate('/requests', { state: { filter: 'IN_PROGRESS' } })} style={{ background: 'linear-gradient(135deg, var(--success) 0%, #059669 100%)', cursor: 'pointer' }}>
                         <div className="stat-label">On Track</div>
                         <div className="stat-value">{dashboard.on_track}</div>
                         <div className="stat-change">{'< 50% time used'}</div>
                     </div>
 
-                    <div className="stat-card light" style={{ borderLeft: '4px solid var(--warning)' }}>
+                    <div className="stat-card light clickable" onClick={() => navigate('/requests', { state: { filter: 'IN_PROGRESS' } })} style={{ borderLeft: '4px solid var(--warning)', cursor: 'pointer' }}>
                         <div className="stat-label">At Risk (50-80%)</div>
                         <div className="stat-value" style={{ color: 'var(--warning)' }}>{dashboard.at_risk_50_percent}</div>
                         <div className="stat-change">Monitor closely</div>
                     </div>
 
-                    <div className="stat-card light" style={{ borderLeft: '4px solid var(--error)' }}>
+                    <div className="stat-card light clickable" onClick={() => navigate('/requests', { state: { filter: 'IN_PROGRESS' } })} style={{ borderLeft: '4px solid var(--error)', cursor: 'pointer' }}>
                         <div className="stat-label">Critical (80%+)</div>
                         <div className="stat-value" style={{ color: 'var(--error)' }}>{dashboard.critical_80_percent}</div>
                         <div className="stat-change">Immediate attention</div>
                     </div>
 
-                    <div className="stat-card" style={{ background: 'linear-gradient(135deg, var(--error) 0%, #991B1B 100%)' }}>
+                    <div className="stat-card clickable" onClick={() => navigate('/requests', { state: { filter: 'OVERDUE' } })} style={{ background: 'linear-gradient(135deg, var(--error) 0%, #991B1B 100%)', cursor: 'pointer' }}>
                         <div className="stat-label">Overdue</div>
                         <div className="stat-value">{dashboard.overdue}</div>
                         <div className="stat-change negative">SLA breached</div>
@@ -74,23 +76,24 @@ export const SLAMonitorPage = () => {
                         <h2 className="card-title">SLA Compliance (This Month)</h2>
                     </div>
                     <div className="grid grid-4">
-                        <div>
+                        <div className="clickable" onClick={() => navigate('/requests')} style={{ cursor: 'pointer', padding: '1rem', borderRadius: 'var(--radius)', transition: 'background 0.2s' }}>
                             <div className="text-small text-muted">Total Requests</div>
                             <div style={{ fontSize: '2rem', fontWeight: '700' }}>{compliance.total_requests}</div>
                         </div>
-                        <div>
+                        <div className="clickable" onClick={() => navigate('/requests', { state: { filter: 'COMPLETED' } })} style={{ cursor: 'pointer', padding: '1rem', borderRadius: 'var(--radius)', transition: 'background 0.2s' }}>
                             <div className="text-small text-muted">Within SLA</div>
                             <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--success)' }}>
                                 {compliance.within_sla}
                             </div>
                         </div>
-                        <div>
-                            <div className="text-small text-muted">Overdue</div>
+                        <div className="clickable" onClick={() => navigate('/requests', { state: { filter: 'COMPLETED' } })} style={{ cursor: 'pointer', padding: '1rem', borderRadius: 'var(--radius)', transition: 'background 0.2s' }}>
+                            <div className="text-small text-muted">Missed SLA</div>
                             <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--error)' }}>
                                 {compliance.overdue}
                             </div>
+                            <div className="text-small text-muted" style={{ fontSize: '0.75rem' }}>Late Completed + Active Overdue</div>
                         </div>
-                        <div>
+                        <div style={{ padding: '1rem' }}>
                             <div className="text-small text-muted">Compliance Rate</div>
                             <div style={{ fontSize: '2rem', fontWeight: '700', color: compliance.compliance_rate >= 80 ? 'var(--success)' : 'var(--warning)' }}>
                                 {compliance.compliance_rate}%

@@ -28,9 +28,10 @@ def calculate_sla_compliance_rate(
 ) -> float:
     """
     Calculate SLA Compliance Rate (%)
-    Formula: # of requests completed within SLA ÷ total requests × 100
+    Formula: # of requests completed within SLA ÷ total evaluated × 100
+    INCLUDES active overdue requests for accurate real-time compliance
     """
-    query = db.query(Request).filter(Request.status == RequestStatus.COMPLETED)
+    query = db.query(Request)
     
     if division_id:
         query = query.filter(Request.requester_division_id == division_id)
@@ -41,16 +42,46 @@ def calculate_sla_compliance_rate(
     if end_date:
         query = query.filter(Request.created_at <= end_date)
     
-    total_requests = query.count()
-    if total_requests == 0:
-        return 0.0
+    # Get completed requests with SLA time defined
+    completed_requests = query.filter(
+        Request.status == RequestStatus.COMPLETED,
+        Request.sla_completion_time_hours.isnot(None),
+        Request.created_at.isnot(None),
+        Request.actual_completion_time.isnot(None)
+    ).all()
     
-    # Count requests where actual_completion_time <= sla_completion_deadline
-    on_time_requests = query.filter(
-        Request.actual_completion_time <= Request.sla_completion_deadline
-    ).count()
+    compliant_completed = 0
+    non_compliant_completed = 0
     
-    return round((on_time_requests / total_requests) * 100, 2)
+    # Check each completed request
+    for req in completed_requests:
+        deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
+        if req.actual_completion_time <= deadline:
+            compliant_completed += 1
+        else:
+            non_compliant_completed += 1
+    
+    # Get active overdue requests
+    now = datetime.utcnow()
+    active_requests = query.filter(
+        Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
+        Request.sla_completion_time_hours.isnot(None),
+        Request.created_at.isnot(None)
+    ).all()
+    
+    overdue_active = 0
+    for req in active_requests:
+        deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
+        if now > deadline:
+            overdue_active += 1
+    
+    # Total evaluated = compliant + non-compliant + overdue active
+    total_evaluated = compliant_completed + non_compliant_completed + overdue_active
+    
+    if total_evaluated == 0:
+        return 100.0  # No requests to evaluate
+    
+    return round((compliant_completed / total_evaluated) * 100, 2)
 
 
 def calculate_service_request_fulfillment_rate(

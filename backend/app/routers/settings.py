@@ -184,3 +184,57 @@ async def test_system_health(
         health_status["status"] = "unhealthy"
     
     return health_status
+
+
+@router.delete("/reset-data")
+async def reset_system_data(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    DANGER: Reset all request-related data.
+    Removes all requests, workflows, logs, alerts, feedback, and resource-specific records.
+    Keeps users, departments, divisions, and system settings.
+    """
+    if current_user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        # 1. Delete Resource-Specific Details (Child tables)
+        from ..models import (
+            FleetRequest, HRDeployment, FinanceTransaction, 
+            ICTTicket, LogisticsRequest, RequestItem, 
+            RequestWorkflow, RequestActivityLog, SLAAlert, 
+            CustomerSatisfaction, Request
+        )
+        
+        # Delete resource specific tables
+        db.query(FleetRequest).delete()
+        db.query(HRDeployment).delete()
+        db.query(FinanceTransaction).delete()
+        db.query(ICTTicket).delete()
+        db.query(LogisticsRequest).delete()
+        
+        # Delete related tables (if cascades fail or for safety)
+        db.query(RequestItem).delete()
+        db.query(RequestWorkflow).delete()
+        db.query(RequestActivityLog).delete()
+        db.query(SLAAlert).delete()
+        db.query(CustomerSatisfaction).delete()
+        
+        # 2. Delete Main Requests Table
+        num_deleted = db.query(Request).delete()
+        
+        db.commit()
+        
+        return {
+            "success": True, 
+            "message": f"System reset successful. {num_deleted} requests and related data removed."
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to reset system data: {str(e)}"
+        )

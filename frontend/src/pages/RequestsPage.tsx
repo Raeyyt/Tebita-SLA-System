@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 import type { Request } from '../types';
@@ -6,9 +7,11 @@ import { PDFViewerModal } from '../components/PDFViewerModal';
 
 export const RequestsPage = () => {
     const { token } = useAuth();
+    const location = useLocation();
+    const initialFilter = (location.state as { filter?: string })?.filter || '';
     const [requests, setRequests] = useState<Request[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('');
+    const [filter, setFilter] = useState(initialFilter);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
     const [isPdfOpen, setIsPdfOpen] = useState(false);
@@ -28,12 +31,27 @@ export const RequestsPage = () => {
         loadRequests();
     }, [token]);
 
-    // Filter requests by search term
+    // Filter requests by search term and status
     const filteredRequests = requests.filter(request => {
         const matchesSearch = !searchTerm ||
             request.request_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
             request.description?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesFilter = !filter || request.status === filter;
+
+        let matchesFilter = true;
+        if (filter === 'OVERDUE') {
+            // Calculate if overdue
+            if (['COMPLETED', 'REJECTED', 'CANCELLED'].includes(request.status)) {
+                matchesFilter = false;
+            } else if (request.created_at && request.sla_completion_time_hours) {
+                const deadline = new Date(new Date(request.created_at).getTime() + request.sla_completion_time_hours * 60 * 60 * 1000);
+                matchesFilter = new Date() > deadline;
+            } else {
+                matchesFilter = false;
+            }
+        } else {
+            matchesFilter = !filter || request.status === filter;
+        }
+
         return matchesSearch && matchesFilter;
     });
 
@@ -127,7 +145,7 @@ export const RequestsPage = () => {
 
             <div className="card">
                 {/* Status Filters */}
-                <div className="flex gap-md" style={{ marginBottom: '1.5rem' }}>
+                <div className="flex gap-md" style={{ marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                     <button
                         className={`btn ${!filter ? 'btn-primary' : 'btn-outline'}`}
                         onClick={() => setFilter('')}
@@ -151,6 +169,13 @@ export const RequestsPage = () => {
                         onClick={() => setFilter('COMPLETED')}
                     >
                         Completed
+                    </button>
+                    <button
+                        className={`btn ${filter === 'OVERDUE' ? 'btn-primary' : 'btn-outline'}`}
+                        onClick={() => setFilter('OVERDUE')}
+                        style={filter === 'OVERDUE' ? { background: 'var(--error)', borderColor: 'var(--error)' } : { color: 'var(--error)', borderColor: 'var(--error)' }}
+                    >
+                        Overdue
                     </button>
                 </div>
 
