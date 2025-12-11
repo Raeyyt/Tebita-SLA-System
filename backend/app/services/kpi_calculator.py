@@ -20,7 +20,12 @@ def calculate_kpi_metrics(db: Session, department_id: int = None, division_id: i
             "total_requests": 0,
             "sla_compliance_rate": 100,
             "avg_resolution_time_hours": 0,
-            "pending_requests": 0
+            "pending_requests": 0,
+            "priority_breakdown": {
+                "high": 0,
+                "medium": 0,
+                "low": 0
+            }
         }
 
     # 1. SLA Resolution Compliance (includes active overdue requests)

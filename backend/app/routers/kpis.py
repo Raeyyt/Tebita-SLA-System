@@ -9,7 +9,7 @@ from ..database import get_db
 from ..auth import get_current_active_user
 from ..models import Request, User, Division, Department, RequestStatus, KPIMetric, Scorecard, ScoreRating
 from .. import schemas
-from ..services.kpi_calculator import calculate_kpi_metrics, calculate_overdue_requests  # NEW: Import KPI service
+from ..services.kpi_calculator import calculate_kpi_metrics, calculate_overdue_requests, calculate_customer_satisfaction_score  # NEW: Import KPI service
 from ..services.access_control import apply_role_based_filtering
 
 router = APIRouter(prefix="/kpis", tags=["kpis"])
@@ -126,7 +126,11 @@ async def get_scorecard(
     
     existing = query.first()
     if existing:
-        return existing
+        # FORCE REFRESH: Delete existing scorecard to ensure new SLA logic is applied
+        # In production, we might want a smarter cache invalidation, but for now this ensures correctness.
+        db.delete(existing)
+        db.commit()
+        # return existing  <-- Commented out to force recalculation
     
     # Calculate new scorecard
     try:
@@ -233,12 +237,15 @@ async def get_kpi_dashboard(
     sla_rate = (compliant / total_evaluated * 100) if total_evaluated > 0 else 100
     avg_completion = sum(completion_times) / len(completion_times) if completion_times else 0
     
+    # Calculate satisfaction score
+    satisfaction_score = calculate_customer_satisfaction_score(db, start_date=month_start, end_date=now)
+    
     return {
         "total_requests": total,
         "avg_response_time": 0,  # Placeholder
         "avg_completion_time": round(avg_completion, 2),
         "sla_compliance_rate": round(sla_rate, 2),
-        "satisfaction_avg": 0,  # Placeholder - would calculate from satisfaction table
+        "satisfaction_avg": round(satisfaction_score, 1),
     }
 
 
@@ -308,13 +315,32 @@ def calculate_scorecard(db: Session, start: datetime, end: datetime, division_id
             if time_taken <= req.sla_completion_time_hours:
                 within_sla += 1
     
-    compliance = (within_sla / len(completed) * 100) if completed else 0
+    # Add active overdue requests to calculation
+    active_overdue = 0
+    now = datetime.utcnow()
+    for req in requests:
+        if req.status in [RequestStatus.PENDING, RequestStatus.IN_PROGRESS]:
+            if req.created_at and req.sla_completion_time_hours:
+                deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
+                if now > deadline:
+                    active_overdue += 1
+    
+    total_evaluated = len(completed) + active_overdue
+    compliance = (within_sla / total_evaluated * 100) if total_evaluated > 0 else 100
     
     # 3. Cost Optimization (20%) - placeholder
     cost_optimization = 75  # Default score
     
-    # 4. Customer Satisfaction (25%) - placeholder
-    satisfaction = 80  # Default score
+    # 4. Customer Satisfaction (25%)
+    # Use the shared calculator service
+    raw_satisfaction = calculate_customer_satisfaction_score(db, division_id, start_date=start, end_date=now)
+    
+    # Convert 1-5 scale to 0-100 for scorecard
+    # 1=0, 2=25, 3=50, 4=75, 5=100
+    if raw_satisfaction > 0:
+        satisfaction = (raw_satisfaction - 1) * 25
+    else:
+        satisfaction = 100 # Default if no ratings (assume good)
     
     # Weight and calculate total
     total = (

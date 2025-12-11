@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 import type { Request } from '../types';
+import { formatDate } from '../utils/dateUtils';
 
 const badgeStyle = (color: string) => ({
     display: 'inline-block',
@@ -113,11 +114,11 @@ export const SentRequestsPage = () => {
                                                 {request.status.replace(/_/g, ' ')}
                                             </span>
                                         </td>
-                                        <td>{new Date(request.submitted_at || request.created_at).toLocaleString()}</td>
-                                        <td>{request.acknowledged_at ? new Date(request.acknowledged_at).toLocaleString() : 'Pending'}</td>
+                                        <td>{formatDate(request.submitted_at || request.created_at)}</td>
+                                        <td>{request.acknowledged_at ? formatDate(request.acknowledged_at) : 'Pending'}</td>
                                         <td>
                                             {request.completed_at
-                                                ? new Date(request.completed_at).toLocaleString()
+                                                ? formatDate(request.completed_at)
                                                 : '—'}
                                         </td>
                                         <td>

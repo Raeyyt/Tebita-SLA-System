@@ -200,6 +200,11 @@ async def reset_system_data(
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:
+        # 0. Create Safety Backup
+        from ..services.backup_service import create_database_backup
+        backup_path = create_database_backup()
+        backup_msg = f"Safety backup created at {backup_path.name}" if backup_path else "Backup failed, but reset proceeded."
+
         # 1. Delete Resource-Specific Details (Child tables)
         from ..models import (
             FleetRequest, HRDeployment, FinanceTransaction, 
@@ -229,7 +234,7 @@ async def reset_system_data(
         
         return {
             "success": True, 
-            "message": f"System reset successful. {num_deleted} requests and related data removed."
+            "message": f"System reset successful. {num_deleted} requests removed. {backup_msg}"
         }
         
     except Exception as e:

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
+import { formatDateOnly, formatTime } from '../utils/dateUtils';
 
 export const MEDashboardPage = () => {
     const { token, user } = useAuth();
@@ -191,9 +192,8 @@ export const MEDashboardPage = () => {
                                             ? dashboard.division_requests
                                             : dashboard.division_requests.slice(0, 10)
                                         ).map((req: any) => {
-                                            const date = req.created_at ? new Date(req.created_at) : null;
-                                            const dateString = date ? date.toLocaleDateString() : '—';
-                                            const timeString = date ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+                                            const dateString = formatDateOnly(req.created_at);
+                                            const timeString = formatTime(req.created_at);
                                             return (
                                                 <tr key={req.request_id}>
                                                     <td>{req.division || 'N/A'}</td>

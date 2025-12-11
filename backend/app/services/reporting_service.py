@@ -1,6 +1,6 @@
 import csv
 import io
-from datetime import datetime
+from datetime import datetime, timedelta
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -63,6 +63,22 @@ def generate_scorecard_pdf(scorecard_data: dict, division_name: str, period: str
     buffer.seek(0)
     return buffer
 
+def format_datetime_for_export(dt: datetime) -> str:
+    """
+    Formats a UTC datetime to EAT (UTC+3) string in 12-hour format.
+    Format: MMM DD, YYYY, h:mm A
+    Example: Dec 11, 2025, 2:09 PM
+    """
+    if not dt:
+        return ""
+    
+    # Convert to EAT (UTC+3)
+    eat_time = dt + timedelta(hours=3)
+    
+    # Format: MMM DD, YYYY, h:mm A
+    # %b = Month abbr, %d = Day, %Y = Year, %I = 12h Hour, %M = Minute, %p = AM/PM
+    return eat_time.strftime("%b %d, %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
+
 def generate_request_export_csv(db: Session, start_date: datetime, end_date: datetime) -> io.StringIO:
     """
     Generates a CSV export of requests in the given period.
@@ -110,12 +126,12 @@ def generate_request_export_csv(db: Session, start_date: datetime, end_date: dat
             req.assigned_division.name if req.assigned_division else "",
             req.assigned_department.name if req.assigned_department else "",
             req.assigned_to.full_name if req.assigned_to else "Unassigned",
-            req.created_at.isoformat() if req.created_at else "",
-            req.submitted_at.isoformat() if req.submitted_at else "",
-            req.acknowledged_at.isoformat() if req.acknowledged_at else "",
-            req.completed_at.isoformat() if req.completed_at else "",
-            req.completion_validated_at.isoformat() if req.completion_validated_at else "",
-            req.sla_completion_deadline.isoformat() if req.sla_completion_deadline else "",
+            format_datetime_for_export(req.created_at),
+            format_datetime_for_export(req.submitted_at),
+            format_datetime_for_export(req.acknowledged_at),
+            format_datetime_for_export(req.completed_at),
+            format_datetime_for_export(req.completion_validated_at),
+            format_datetime_for_export(req.sla_completion_deadline),
             actual_hours,
             calculate_sla_status(req)
         ])

@@ -3,6 +3,7 @@ import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import type { Request } from '../types';
+import { formatDate } from '../utils/dateUtils';
 
 const statusColors: Record<string, string> = {
     PENDING: '#f59e0b',
@@ -193,7 +194,7 @@ export const RequestInboxPage = () => {
                                                 {request.status.replace(/_/g, ' ')}
                                             </span>
                                         </td>
-                                        <td>{new Date(request.submitted_at || request.created_at).toLocaleString()}</td>
+                                        <td>{formatDate(request.submitted_at || request.created_at)}</td>
                                         <td>
                                             <div style={{ display: 'flex', gap: '0.5rem' }}>
                                                 <button
@@ -373,7 +374,7 @@ export const RequestInboxPage = () => {
                                                 {request.status.replace(/_/g, ' ')}
                                             </span>
                                         </td>
-                                        <td>{request.completed_at ? new Date(request.completed_at).toLocaleString() : 'N/A'}</td>
+                                        <td>{request.completed_at ? formatDate(request.completed_at) : 'N/A'}</td>
                                         <td>
                                             <button
                                                 className="btn btn-outline"

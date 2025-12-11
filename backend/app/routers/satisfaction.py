@@ -70,6 +70,11 @@ async def submit_rating(
     )
     
     db.add(new_rating)
+    
+    # Sync to Request table for dashboard compatibility
+    request.satisfaction_rating = rating.overall_score
+    request.satisfaction_comment = rating.comments
+    
     db.commit()
     db.refresh(new_rating)
     

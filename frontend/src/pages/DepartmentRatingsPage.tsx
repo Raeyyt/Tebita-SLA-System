@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 import { Link } from 'react-router-dom';
+import { formatDate } from '../utils/dateUtils';
 
 interface DepartmentRating {
     department_id: number;
@@ -276,7 +277,7 @@ export const DepartmentRatingsPage = () => {
                                                     "{comment.comment}"
                                                 </div>
                                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                    {new Date(comment.submitted_at).toLocaleDateString()} •{' '}
+                                                    {formatDate(comment.submitted_at)} •{' '}
                                                     <Link to={`/requests/${comment.request_id}`} style={{ color: 'var(--primary)' }}>
                                                         View Request
                                                     </Link>

@@ -25,6 +25,7 @@ from .. import schemas
 from ..services.sla_calculator import calculate_deadlines  # NEW: Import SLA service
 from ..services.notification_service import send_user_notification
 from ..services.access_control import apply_role_based_filtering
+from ..services.reporting_service import format_datetime_for_export
 
 router = APIRouter(prefix="/requests", tags=["requests"])
 
@@ -211,7 +212,8 @@ async def create_request(
         request_id=request_id,
         requester_id=current_user.id,
         status=RequestStatus.PENDING,
-        submitted_at=datetime.utcnow()
+        submitted_at=datetime.utcnow(),
+        created_at=datetime.utcnow()
     )
     
     # Calculate SLA deadlines using policy-based system
@@ -603,7 +605,7 @@ async def export_request_activity_logs(
             log.target_department.name if log.target_department else "",
             log.target_division.name if log.target_division else "",
             log.details or "",
-            log.created_at.isoformat() if log.created_at else "",
+            format_datetime_for_export(log.created_at),
         ])
 
     output.seek(0)

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 import type { Request } from '../types';
 import { PDFViewerModal } from '../components/PDFViewerModal';
+import { formatDate } from '../utils/dateUtils';
 
 export const RequestsPage = () => {
     const { token } = useAuth();
@@ -230,7 +231,7 @@ export const RequestsPage = () => {
                                                 {request.status.replace(/_/g, ' ')}
                                             </span>
                                         </td>
-                                        <td>{new Date(request.created_at).toLocaleDateString()}</td>
+                                        <td>{formatDate(request.created_at)}</td>
                                         <td>
                                             <button
                                                 className="btn btn-outline"
