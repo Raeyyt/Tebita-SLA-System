@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { getApiUrl } from '../services/api';
 
 interface PDFViewerModalProps {
     requestId: number;
@@ -23,7 +24,7 @@ export const PDFViewerModal = ({ requestId, requestNumber, isOpen, onClose }: PD
             setLoading(true);
             setError(null);
             try {
-                const apiBase = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8001';
+                const apiBase = getApiUrl();
                 const response = await fetch(`${apiBase}/api/requests/${requestId}/pdf`, {
                     headers: {
                         Authorization: `Bearer ${token}`,

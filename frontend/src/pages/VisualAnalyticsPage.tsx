@@ -5,6 +5,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { getApiUrl } from '../services/api';
 import axios from 'axios';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -104,7 +105,7 @@ const VisualAnalyticsPage: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
-            const response = await axios.get(`${import.meta.env.VITE_API_URL}/visual-analytics/dashboard`, {
+            const response = await axios.get(`${getApiUrl()}/visual-analytics/dashboard`, {
                 params: { period },
                 headers: {
                     Authorization: `Bearer ${token}`,

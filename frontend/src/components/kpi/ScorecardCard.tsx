@@ -36,16 +36,7 @@ export const ScorecardCard: React.FC<ScorecardProps> = ({ data, loading, error }
     const rating = data.rating || 'N/A';
 
     // Helper for rating color
-    const getRatingColor = (r: string) => {
-        switch (r) {
-            case 'OUTSTANDING': return '#059669'; // Green
-            case 'VERY_GOOD': return '#10B981';
-            case 'GOOD': return '#D97706'; // Gold
-            case 'NEEDS_IMPROVEMENT': return '#F59E0B';
-            case 'UNSATISFACTORY': return '#DC2626'; // Red
-            default: return '#6B7280';
-        }
-    };
+
 
     return (
         <div className="card" style={{ padding: '0', overflow: 'hidden', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>

@@ -67,8 +67,8 @@ async def get_visual_dashboard_data(
         "completed_count": completed_count,
         "satisfaction": calculate_customer_satisfaction_score(db, None, custom_start, custom_end),
         "integration_index": integration_data.get("integration_index", 0),
-        "resource_optimization": 85.0, # Placeholder
-        "avg_cost_per_request": 0.0 # Placeholder
+        "resource_optimization": 85.0, # Placeholder (Demo Value)
+        "avg_cost_per_request": 0.0 # Placeholder (Requires Finance Module)
     }
     
     # Calculate all chart data

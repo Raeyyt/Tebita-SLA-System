@@ -1,5 +1,6 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { getApiUrl } from '../services/api';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
@@ -27,7 +28,7 @@ export const AppLayout = () => {
         const fetchUnreadCount = async () => {
             if (!token) return;
             try {
-                const API_BASE = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8001';
+                const API_BASE = getApiUrl();
                 const response = await axios.get(`${API_BASE}/notifications/unread-count`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
@@ -47,7 +48,7 @@ export const AppLayout = () => {
         if (!token) return;
 
         const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
-        let timeoutId: NodeJS.Timeout;
+        let timeoutId: ReturnType<typeof setTimeout>;
 
         const performAutoLogout = () => {
             console.log("User inactive for 15 minutes, performing auto-logout.");

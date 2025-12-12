@@ -11,34 +11,33 @@ export const RequestViewPage = () => {
     const { token } = useAuth();
     const [request, setRequest] = useState<Request | null>(null);
     const [loading, setLoading] = useState(true);
-    const [showPdf, setShowPdf] = useState(false);
-    const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
 
     // Resource-specific state
     const [fleetDetails, setFleetDetails] = useState<FleetRequest | null>(null);
-    const [fleetLoading, setFleetLoading] = useState(false);
+    const [_fleetLoading, setFleetLoading] = useState(false);
     const [fleetForm, setFleetForm] = useState<Partial<FleetRequest>>({});
 
     const [hrDetails, setHrDetails] = useState<HRDeployment | null>(null);
-    const [hrLoading, setHrLoading] = useState(false);
+    const [_hrLoading, setHrLoading] = useState(false);
     const [hrForm, setHrForm] = useState<Partial<HRDeployment>>({});
 
     const [financeDetails, setFinanceDetails] = useState<FinanceTransaction | null>(null);
-    const [financeLoading, setFinanceLoading] = useState(false);
+    const [_financeLoading, setFinanceLoading] = useState(false);
     const [financeForm, setFinanceForm] = useState<Partial<FinanceTransaction>>({});
 
     const [ictDetails, setIctDetails] = useState<ICTTicket | null>(null);
-    const [ictLoading, setIctLoading] = useState(false);
+    const [_ictLoading, setIctLoading] = useState(false);
     const [ictForm, setIctForm] = useState<Partial<ICTTicket>>({});
 
     const [logisticsDetails, setLogisticsDetails] = useState<LogisticsRequest | null>(null);
-    const [logisticsLoading, setLogisticsLoading] = useState(false);
+    const [_logisticsLoading, setLogisticsLoading] = useState(false);
     const [logisticsForm, setLogisticsForm] = useState<Partial<LogisticsRequest>>({});
 
     // Rating state
     const [showRatingModal, setShowRatingModal] = useState(false);
     const [existingRating, setExistingRating] = useState<any>(null);
-    const [ratingLoading, setRatingLoading] = useState(false);
+    const [_ratingLoading, setRatingLoading] = useState(false);
 
     useEffect(() => {
         const fetchRequest = async () => {
@@ -245,61 +244,9 @@ export const RequestViewPage = () => {
         }
     };
 
-    const loadPdf = async (requestId: number) => {
-        if (!token) return;
-        try {
-            // Use the same API_BASE logic as api.ts
-            const getApiUrl = () => {
-                if (import.meta.env.VITE_API_URL) {
-                    return import.meta.env.VITE_API_URL;
-                }
-                return `http://${window.location.hostname}:8000`;
-            };
-            const API_BASE = getApiUrl();
-            const url = `${API_BASE}/api/requests/${requestId}/pdf`;
 
-            console.log('Loading PDF from:', url);
 
-            // Fetch PDF with auth headers then create blob URL
-            const response = await fetch(url, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
 
-            console.log('PDF Response status:', response.status);
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('PDF Error Response:', errorText);
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const blob = await response.blob();
-            console.log('PDF Blob size:', blob.size, 'type:', blob.type);
-
-            if (blob.size === 0) {
-                throw new Error('PDF file is empty');
-            }
-
-            const blobUrl = URL.createObjectURL(blob);
-            setPdfUrl(blobUrl);
-            setShowPdf(true);
-        } catch (error: any) {
-            console.error('Failed to load PDF:', error);
-            const message = error.message || 'Unknown error';
-            alert(`Failed to load PDF: ${message}\n\nPlease check the console for details or contact support.`);
-        }
-    };
-
-    const closePdf = () => {
-        if (pdfUrl) {
-            URL.revokeObjectURL(pdfUrl); // Clean up blob URL
-        }
-        setShowPdf(false);
-        setPdfUrl(null);
-        navigate(-1); // Go back after closing PDF
-    };
 
     const getPriorityColor = (priority: string) => {
         const colors: Record<string, string> = {
@@ -336,49 +283,7 @@ export const RequestViewPage = () => {
         );
     }
 
-    // If PDF modal is open, show it
-    if (showPdf && pdfUrl) {
-        return (
-            <div className="modal-overlay" style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0, 0, 0, 0.9)',
-                zIndex: 9999,
-                display: 'flex',
-                flexDirection: 'column',
-            }}>
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '1rem 2rem',
-                    backgroundColor: '#1a1a1a',
-                    color: 'white',
-                }}>
-                    <h2 style={{ margin: 0 }}>Request {request.request_id} - PDF View</h2>
-                    <button onClick={closePdf} className="btn btn-outline" style={{
-                        background: 'white',
-                        color: '#333',
-                        border: 'none',
-                    }}>
-                        ✕ Close
-                    </button>
-                </div>
-                <iframe
-                    src={`${pdfUrl}#toolbar=0`}
-                    style={{
-                        flex: 1,
-                        border: 'none',
-                        width: '100%',
-                    }}
-                    title="Request PDF"
-                />
-            </div>
-        );
-    }
+
 
     return (
         <div style={{ maxWidth: '900px', margin: '0 auto', background: 'white' }}>

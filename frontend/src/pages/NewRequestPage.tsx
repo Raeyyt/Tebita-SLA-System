@@ -255,9 +255,7 @@ export const NewRequestPage = () => {
     );
 
     const senderDivisionName = divisions.find(div => String(div.id) === senderDivisionId)?.name || 'Not assigned';
-    const senderDepartmentOptions = departments.filter(
-        dept => dept.division_id === Number(senderDivisionId)
-    );
+
     return (
         <div>
             <div className="card-header">

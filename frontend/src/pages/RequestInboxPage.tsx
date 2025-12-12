@@ -48,13 +48,11 @@ export const RequestInboxPage = () => {
 
     const handleAcknowledge = async (requestId: number) => {
         if (!token) return;
-        console.log('Acknowledging request:', requestId);
         try {
             setActionLoading(requestId);
-            await api.acknowledgeRequest(token, requestId);
-            console.log('Acknowledge successful - reloading page');
-            // Force page reload to ensure UI updates
-            window.location.reload();
+            const updatedRequest = await api.acknowledgeRequest(token, requestId);
+            setRequests(prev => prev.map(req => req.id === requestId ? updatedRequest : req));
+            setActionLoading(null);
         } catch (err: any) {
             console.error('Failed to acknowledge request', err);
             const errorMessage = err.response?.data?.detail || 'Failed to acknowledge request';
@@ -67,8 +65,16 @@ export const RequestInboxPage = () => {
         if (!token) return;
         try {
             setActionLoading(requestId);
-            await api.completeRequest(token, requestId);
-            window.location.reload();
+            const updatedRequest = await api.completeRequest(token, requestId);
+            console.log('Completed Request Response:', updatedRequest);
+            console.log('Completed At:', updatedRequest.completed_at);
+
+            setRequests(prev => {
+                const newRequests = prev.map(req => req.id === requestId ? updatedRequest : req);
+                console.log('New Requests State:', newRequests);
+                return newRequests;
+            });
+            setActionLoading(null);
         } catch (err: any) {
             console.error('Failed to complete request', err);
             setError(err.response?.data?.detail || 'Failed to complete request');
@@ -76,28 +82,14 @@ export const RequestInboxPage = () => {
         }
     };
 
-    const handleValidate = async (requestId: number) => {
-        if (!token) return;
-        try {
-            setActionLoading(requestId);
-            await api.validateRequestCompletion(token, requestId);
-            window.location.reload();
-        } catch (err: any) {
-            console.error('Failed to validate completion', err);
-            setError(err.response?.data?.detail || 'Failed to validate completion');
-            setActionLoading(null);
-        }
-    };
+
 
     const pendingAcknowledgement = useMemo(
         () => requests.filter((req) => !req.acknowledged_at),
         [requests]
     );
 
-    const pendingValidation = useMemo(
-        () => requests.filter((req) => req.completed_at && !req.completion_validated_at),
-        [requests]
-    );
+
 
     const acknowledgedRequests = useMemo(
         () => requests.filter((req) => req.acknowledged_at && !req.completed_at),

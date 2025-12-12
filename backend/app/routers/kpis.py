@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from ..database import get_db
 from ..auth import get_current_active_user
-from ..models import Request, User, Division, Department, RequestStatus, KPIMetric, Scorecard, ScoreRating
+from ..models import Request, User, Division, Department, RequestStatus, KPIMetric, Scorecard, ScoreRating, UserRole
 from .. import schemas
 from ..services.kpi_calculator import calculate_kpi_metrics, calculate_overdue_requests, calculate_customer_satisfaction_score  # NEW: Import KPI service
 from ..services.access_control import apply_role_based_filtering
@@ -29,11 +29,11 @@ async def get_realtime_kpis(
     division_id_filter = None
     department_id_filter = None
     
-    if current_user.role == "DIVISION_MANAGER":
+    if current_user.role == UserRole.DIVISION_MANAGER:
         division_id_filter = current_user.division_id
-    elif current_user.role == "DEPARTMENT_HEAD":
+    elif current_user.role == UserRole.DEPARTMENT_HEAD:
         department_id_filter = current_user.department_id
-    elif current_user.role != "ADMIN":
+    elif current_user.role != UserRole.ADMIN:
         # Regular staff shouldn't really see this, but default to their dept
         department_id_filter = current_user.department_id
         
@@ -71,6 +71,17 @@ async def get_kpi_metrics(
         start = now - timedelta(days=90)
     else:  # month
         start = now - timedelta(days=30)
+    
+    # Enforce role-based filtering for real-time calculations
+    if current_user.role == UserRole.DIVISION_MANAGER:
+        division_id = current_user.division_id
+        department_id = None  # Division managers see all depts in their division
+    elif current_user.role == UserRole.DEPARTMENT_HEAD:
+        department_id = current_user.department_id
+        # division_id might be passed, but department_id is the stricter constraint
+    elif current_user.role != UserRole.ADMIN:
+        # Regular staff -> default to their department
+        department_id = current_user.department_id
     
     # Query metrics
     query = db.query(KPIMetric).filter(KPIMetric.recorded_at >= start)
@@ -111,6 +122,15 @@ async def get_scorecard(
         start = now - timedelta(days=90)
     else:  # month
         start = now - timedelta(days=30)
+        
+    # Enforce role-based filtering
+    if current_user.role == UserRole.DIVISION_MANAGER:
+        division_id = current_user.division_id
+        department_id = None
+    elif current_user.role == UserRole.DEPARTMENT_HEAD:
+        department_id = current_user.department_id
+    elif current_user.role != UserRole.ADMIN:
+        department_id = current_user.department_id
     
     # Check for existing scorecard
     query = db.query(Scorecard).filter(
@@ -255,9 +275,9 @@ def calculate_realtime_kpis(db: Session, start: datetime, end: datetime, divisio
     query = db.query(Request).filter(Request.created_at >= start, Request.created_at <= end)
     
     if division_id:
-        query = query.filter(Request.requester_division_id == division_id)
+        query = query.filter(Request.assigned_division_id == division_id)
     if department_id:
-        query = query.filter(Request.requester_department_id == department_id)
+        query = query.filter(Request.assigned_department_id == department_id)
     
     requests = query.all()
     
@@ -282,9 +302,9 @@ def calculate_scorecard(db: Session, start: datetime, end: datetime, division_id
     query = db.query(Request).filter(Request.created_at >= start, Request.created_at <= end)
     
     if division_id:
-        query = query.filter(Request.requester_division_id == division_id)
+        query = query.filter(Request.assigned_division_id == division_id)
     if department_id:
-        query = query.filter(Request.requester_department_id == department_id)
+        query = query.filter(Request.assigned_department_id == department_id)
     
     requests = query.all()
     
@@ -329,7 +349,8 @@ def calculate_scorecard(db: Session, start: datetime, end: datetime, division_id
     compliance = (within_sla / total_evaluated * 100) if total_evaluated > 0 else 100
     
     # 3. Cost Optimization (20%) - placeholder
-    cost_optimization = 75  # Default score
+    # Future: Calculate based on budget variance or resource utilization
+    cost_optimization = 75  # Default demo score
     
     # 4. Customer Satisfaction (25%)
     # Use the shared calculator service

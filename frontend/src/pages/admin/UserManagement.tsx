@@ -265,10 +265,18 @@ export default function UserManagement() {
     if (formData.password && formData.password.length < 8) errors.password = 'Password must be at least 8 characters';
     if (!formData.role) errors.role = 'Role is required';
 
-    // Mandatory Hierarchy Validation
-    if (!formData.division_id) errors.division_id = 'Division is required';
-    if (!formData.department_id) errors.department_id = 'Department is required';
-    if (!formData.subdepartment_id) errors.subdepartment_id = 'Sub-Department is required';
+    // Dynamic Hierarchy Validation
+    if (formData.role !== 'ADMIN') {
+      if (!formData.division_id) errors.division_id = 'Division is required';
+
+      if (['DEPARTMENT_HEAD', 'SUB_DEPARTMENT_STAFF'].includes(formData.role)) {
+        if (!formData.department_id) errors.department_id = 'Department is required';
+      }
+
+      if (formData.role === 'SUB_DEPARTMENT_STAFF') {
+        if (!formData.subdepartment_id) errors.subdepartment_id = 'Sub-Department is required';
+      }
+    }
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -540,7 +548,9 @@ export default function UserManagement() {
 
               {/* Cascading Organizational Dropdowns */}
               <div className="form-group">
-                <label className="form-label">Division *</label>
+                <label className="form-label">
+                  Division {formData.role !== 'ADMIN' && '*'}
+                </label>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <select
                     className="form-select"
@@ -568,7 +578,9 @@ export default function UserManagement() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Department *</label>
+                <label className="form-label">
+                  Department {['DEPARTMENT_HEAD', 'SUB_DEPARTMENT_STAFF'].includes(formData.role) && '*'}
+                </label>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <select
                     className="form-select"
@@ -604,7 +616,9 @@ export default function UserManagement() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Sub-Department *</label>
+                <label className="form-label">
+                  Sub-Department {formData.role === 'SUB_DEPARTMENT_STAFF' && '*'}
+                </label>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <select
                     className="form-select"

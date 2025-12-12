@@ -2,7 +2,7 @@ import axios from 'axios';
 import type { User, Request, RequestItem, Division, Department, SubDepartment, FleetRequest, HRDeployment, FinanceTransaction, ICTTicket, LogisticsRequest } from '../types';
 
 // Dynamic API URL detection
-const getApiUrl = () => {
+export const getApiUrl = () => {
     // 1. Prefer environment variable if set
     if (import.meta.env.VITE_API_URL) {
         return import.meta.env.VITE_API_URL;

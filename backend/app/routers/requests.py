@@ -282,6 +282,12 @@ async def create_request(
                 User.department_id == request.assigned_department_id,
                 User.role.in_([UserRole.DEPARTMENT_HEAD, UserRole.DIVISION_MANAGER])
             ).all()
+        elif request.assigned_division_id:
+            # Get division manager
+            assigned_users = db.query(User).filter(
+                User.division_id == request.assigned_division_id,
+                User.role == UserRole.DIVISION_MANAGER
+            ).all()
         
         if assigned_users:
             logger.info(f"Found {len(assigned_users)} assigned users, sending email...")
@@ -309,6 +315,12 @@ def _ensure_user_is_assignee(request: Request, user: User):
         if request.assigned_division_id == user.division_id:
             return
         raise HTTPException(status_code=403, detail="Not authorized for this division")
+
+    # Department Head can act on requests in their department
+    if user.role == "DEPARTMENT_HEAD":
+        if request.assigned_department_id == user.department_id:
+            return
+        raise HTTPException(status_code=403, detail="Not authorized for this department")
 
     # Check direct assignment to user
     if request.assigned_to_user_id == user.id:
@@ -383,7 +395,7 @@ async def acknowledge_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    print(f"🔵 Acknowledge request {request_id} by user {current_user.username} (ID: {current_user.id})")
+    print(f"Acknowledge request {request_id} by user {current_user.username} (ID: {current_user.id})")
     request = db.get(Request, request_id)
     if not request:
         raise HTTPException(status_code=404, detail="Request not found")
@@ -396,10 +408,10 @@ async def acknowledge_request(
     print(f"   Current user subdept: {current_user.subdepartment_id}")
     
     _ensure_user_is_assignee(request, current_user)
-    print(f"   ✅ Authorization passed")
+    print(f"   Authorization passed")
 
     if request.acknowledged_at:
-        print(f"   ❌ Already acknowledged at {request.acknowledged_at}")
+        print(f"   Already acknowledged at {request.acknowledged_at}")
         raise HTTPException(status_code=400, detail="Request already acknowledged")
 
     # Update request status and timestamps
@@ -424,7 +436,7 @@ async def acknowledge_request(
     )
     db.commit()
     db.refresh(request)
-    print(f"   ✅ Request acknowledged successfully!")
+    print(f"   Request acknowledged successfully!")
     return request
 
 
@@ -436,7 +448,7 @@ async def complete_request(
     current_user: User = Depends(get_current_active_user)
 ):
     """Mark a request as completed"""
-    print(f"🟢 Complete request {request_id} by user {current_user.username}")
+    print(f"Complete request {request_id} by user {current_user.username}")
     request = db.get(Request, request_id)
     if not request:
         raise HTTPException(status_code=404, detail="Request not found")
@@ -464,7 +476,7 @@ async def complete_request(
     
     db.commit()
     db.refresh(request)
-    print(f"   ✅ Request completed successfully!")
+    print(f"   Request completed successfully!")
     return request
 
 

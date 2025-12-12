@@ -1,6 +1,8 @@
 import smtplib
 from email.mime.text import MIMEText
+from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.image import MIMEImage
 from typing import List, Optional
 import logging
 from sqlalchemy.orm import Session
@@ -77,7 +79,57 @@ class EmailService:
             html_body = EmailService._create_email_html(request)
             
             # Send email
-            return EmailService._send_email(recipients, subject, html_body, smtp_host, smtp_port, smtp_user, smtp_pass)
+            # Send email with attachments
+            try:
+                # Define image paths
+                import os
+                # Current file: backend/app/services/email_service.py
+                # We need to go up 4 levels to reach project root: services -> app -> backend -> Tebita-SLA-System
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                backend_dir = os.path.dirname(os.path.dirname(current_dir))
+                project_root = os.path.dirname(backend_dir)
+                
+                header_logo_path = os.path.join(project_root, "frontend", "public", "tebita-email-header.png")
+                icon_image_path = os.path.join(project_root, "frontend", "public", "tebita-email-icon.png")
+                
+                images = []
+                
+                # Helper to load image
+                def load_image(path, cid):
+                    if os.path.exists(path):
+                        with open(path, 'rb') as f:
+                            img_data = f.read()
+                            return {"data": img_data, "cid": cid, "name": os.path.basename(path)}
+                    return None
+
+                img1 = load_image(header_logo_path, "header_logo")
+                if img1: images.append(img1)
+                
+                img2 = load_image(icon_image_path, "icon_image")
+                if img2: images.append(img2)
+
+                return EmailService._send_email(
+                    recipients=recipients,
+                    subject=subject,
+                    html_body=html_body,
+                    smtp_host=smtp_host,
+                    smtp_port=smtp_port,
+                    smtp_user=smtp_user,
+                    smtp_pass=smtp_pass,
+                    images=images
+                )
+            except Exception as e:
+                logger.error(f"Error preparing email images: {e}")
+                # Fallback to sending without images if file access fails
+                return EmailService._send_email(
+                    recipients=recipients,
+                    subject=subject,
+                    html_body=html_body,
+                    smtp_host=smtp_host,
+                    smtp_port=smtp_port,
+                    smtp_user=smtp_user,
+                    smtp_pass=smtp_pass
+                )
             
         except Exception as e:
             logger.error(f"Failed to send email notification: {e}")
@@ -96,85 +148,142 @@ class EmailService:
         )
         
         # Format deadline
-        deadline = request.due_date.strftime("%b %d, %Y - %I:%M %p") if request.due_date else "Not set"
+        deadline = request.sla_completion_deadline.strftime("%b %d, %Y - %I:%M %p") if request.sla_completion_deadline else "Not set"
         
         # Create request link
         request_link = f"{settings.FRONTEND_URL}/requests/{request.id}"
         
-        priority_color = "#ef4444" if request.priority == "HIGH" else "#f59e0b" if request.priority == "MEDIUM" else "#10b981"
-        priority_emoji = "🔴" if request.priority == "HIGH" else "🟡" if request.priority == "MEDIUM" else "🟢"
+        # Fix priority display (handle Enum)
+        priority_display = request.priority.value if hasattr(request.priority, 'value') else str(request.priority)
+        if "Priority." in priority_display:
+            priority_display = priority_display.split('.')[-1]
+            
+        priority_color = "#dc2626" if priority_display == "HIGH" else "#d97706" if priority_display == "MEDIUM" else "#059669"
         
+        # HTML Content with CID references - Table Based for Maximum Compatibility
         html = f"""
-<!DOCTYPE html>
-<html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-    <meta charset="utf-8">
-    <style>
-        body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-        .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
-        .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
-        .details {{ background: white; padding: 20px; border-left: 4px solid {priority_color}; margin: 20px 0; }}
-        .detail-row {{ display: flex; margin: 10px 0; }}
-        .detail-label {{ font-weight: bold; min-width: 140px; }}
-        .button {{ display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }}
-        .footer {{ text-align: center; color: #666; margin-top: 30px; font-size: 12px; }}
-    </style>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>New Request Assigned</title>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>{priority_emoji} {request.priority} PRIORITY REQUEST</h1>
-            <p>A new request has been assigned to {assigned_to}</p>
-        </div>
-        
-        <div class="content">
-            <div class="details">
-                <h2>Request Details</h2>
-                <div class="detail-row">
-                    <span class="detail-label">Request ID:</span>
-                    <span>{request.request_id}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Priority:</span>
-                    <span style="color: {priority_color}; font-weight: bold;">{priority_emoji} {request.priority}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Type:</span>
-                    <span>{request.request_type.replace('_', ' ').title()}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Submitted By:</span>
-                    <span>{request.requester.full_name if request.requester else 'N/A'}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Deadline:</span>
-                    <span>{deadline}</span>
-                </div>
-            </div>
-            
-            <div style="background: white; padding: 20px; margin: 20px 0;">
-                <h3>Description:</h3>
-                <p>{request.description}</p>
-            </div>
-            
-            <div style="text-align: center;">
-                <a href="{request_link}" class="button">View Request in System</a>
-            </div>
-            
-            <p style="background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin-top: 20px;">
-                ⚠️ <strong>Action Required:</strong> Please review and acknowledge this request.
-            </p>
-        </div>
-        
-        <div class="footer">
-            <p><strong>Tebita Ambulance SLA System</strong></p>
-            <p>ጠብታ አምቡላንስ</p>
-            <p style="font-size: 10px; color: #999;">
-                This is an automated notification. Please do not reply to this email.
-            </p>
-        </div>
-    </div>
+<body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: Arial, sans-serif;">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td style="padding: 20px 0 30px 0;">
+                <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="border-collapse: collapse; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td align="center" bgcolor="#8B0000" style="padding: 30px 20px;">
+                            <img src="cid:header_logo" alt="Tebita Ambulance" width="220" style="display: block; max-width: 100%; height: auto;" />
+                        </td>
+                    </tr>
+                    
+                    <!-- Main Content -->
+                    <tr>
+                        <td bgcolor="#ffffff" style="padding: 40px 30px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <!-- Icon & Title -->
+                                <tr>
+                                    <td align="center" style="padding-bottom: 20px;">
+                                        <img src="cid:icon_image" alt="Alert" width="80" style="display: block; max-width: 80px; height: auto;" />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="color: #111111; font-size: 24px; font-weight: bold; padding-bottom: 10px;">
+                                        New Request Assigned
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="color: #666666; font-size: 16px; line-height: 1.5; padding-bottom: 30px;">
+                                        A new request has been submitted to <strong>{assigned_to}</strong>.
+                                    </td>
+                                </tr>
+                                
+                                <!-- Details Box -->
+                                <tr>
+                                    <td>
+                                        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border: 1px solid #eeeeee; border-radius: 6px;">
+                                            <tr>
+                                                <td width="35%" style="padding: 15px; border-bottom: 1px solid #eeeeee; color: #666666; font-weight: bold; font-size: 14px;">Request ID</td>
+                                                <td width="65%" style="padding: 15px; border-bottom: 1px solid #eeeeee; color: #111111; font-size: 14px;"><strong>{request.request_id}</strong></td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 15px; border-bottom: 1px solid #eeeeee; color: #666666; font-weight: bold; font-size: 14px;">Priority</td>
+                                                <td style="padding: 15px; border-bottom: 1px solid #eeeeee; font-size: 14px;">
+                                                    <span style="background-color: {priority_color}; color: #ffffff; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;">{priority_display}</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 15px; border-bottom: 1px solid #eeeeee; color: #666666; font-weight: bold; font-size: 14px;">Type</td>
+                                                <td style="padding: 15px; border-bottom: 1px solid #eeeeee; color: #111111; font-size: 14px;">{request.request_type.replace('_', ' ').title()}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 15px; border-bottom: 1px solid #eeeeee; color: #666666; font-weight: bold; font-size: 14px;">Submitted By</td>
+                                                <td style="padding: 15px; border-bottom: 1px solid #eeeeee; color: #111111; font-size: 14px;">{request.requester.full_name if request.requester else 'N/A'}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 15px; color: #666666; font-weight: bold; font-size: 14px;">Deadline</td>
+                                                <td style="padding: 15px; color: #111111; font-size: 14px;">{deadline}</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Description -->
+                                <tr>
+                                    <td style="padding-top: 30px;">
+                                        <div style="background-color: #f9f9f9; border-left: 4px solid #8B0000; padding: 15px; border-radius: 4px;">
+                                            <div style="color: #8B0000; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-bottom: 5px;">Description</div>
+                                            <div style="color: #333333; font-size: 14px; line-height: 1.6;">{request.description}</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Button -->
+                                <tr>
+                                    <td align="center" style="padding-top: 30px;">
+                                        <table border="0" cellspacing="0" cellpadding="0">
+                                            <tr>
+                                                <td align="center" style="border-radius: 4px;" bgcolor="#8B0000">
+                                                    <a href="{request_link}" target="_blank" style="font-size: 16px; font-family: Arial, sans-serif; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 4px; border: 1px solid #8B0000; display: inline-block; font-weight: bold;">View Request</a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td bgcolor="#8B0000" style="padding: 30px 30px;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="center" style="color: #ffffff; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; padding-bottom: 10px;">
+                                        Tebita Ambulance Pre-Hospital Emergency Medical Service
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="color: #ffffff; font-family: Arial, sans-serif; font-size: 12px; opacity: 0.8;">
+                                        Addis Ababa, Ethiopia
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="color: #ffffff; font-family: Arial, sans-serif; font-size: 12px; opacity: 0.6; padding-top: 20px;">
+                                        This is an automated notification. Please do not reply.
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>
 """
@@ -188,12 +297,13 @@ class EmailService:
         smtp_host: str,
         smtp_port: int,
         smtp_user: str,
-        smtp_pass: str
+        smtp_pass: str,
+        images: Optional[List[dict]] = None
     ) -> bool:
         """Send email using SMTP with provided credentials"""
         try:
             # Create message
-            msg = MIMEMultipart('alternative')
+            msg = MIMEMultipart('related')
             msg['From'] = f"{settings.SMTP_FROM_NAME} <{smtp_user}>"
             msg['To'] = ", ".join(recipients)
             msg['Subject'] = subject
@@ -201,6 +311,17 @@ class EmailService:
             # Attach HTML body
             html_part = MIMEText(html_body, 'html')
             msg.attach(html_part)
+            
+            # Attach images if provided
+            if images:
+                for img in images:
+                    try:
+                        image_part = MIMEImage(img['data'], name=img['name'])
+                        image_part.add_header('Content-ID', f"<{img['cid']}>")
+                        image_part.add_header('Content-Disposition', 'inline', filename=img['name'])
+                        msg.attach(image_part)
+                    except Exception as e:
+                        logger.error(f"Failed to attach image {img.get('name')}: {e}")
             
             # Connect to SMTP server
             with smtplib.SMTP(smtp_host, smtp_port) as server:
@@ -219,5 +340,4 @@ class EmailService:
 # Global instance
 email_service = EmailService()
 
-# Global instance
-email_service = EmailService()
+

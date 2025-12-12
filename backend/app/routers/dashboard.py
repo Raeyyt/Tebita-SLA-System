@@ -75,9 +75,11 @@ def get_dashboard_stats(
     sla_compliance = round((compliant / total_with_sla * 100) if total_with_sla else 0, 1)
     
     # SLA alerts count
-    active_alerts = db.query(SLAAlert).filter(
+    active_alerts_query = db.query(SLAAlert).join(Request).filter(
         SLAAlert.acknowledged_at.is_(None)
-    ).count()
+    )
+    active_alerts_query = apply_role_based_filtering(active_alerts_query, current_user, model=Request)
+    active_alerts = active_alerts_query.count()
     
     return {
         "total_requests": total_requests,
