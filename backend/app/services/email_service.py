@@ -1,11 +1,12 @@
 import smtplib
 from email.mime.text import MIMEText
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
+from email.utils import make_msgid
 from typing import List, Optional
 import logging
 from sqlalchemy.orm import Session
+import os
 
 from ..config import settings
 from ..models import Request, User, SystemSettings
@@ -73,16 +74,30 @@ class EmailService:
                 logger.warning(f"No email recipients for request {request.request_id}")
                 return False
             
-            # Create email content
-            priority_emoji = "🔴" if request.priority == "HIGH" else "🟡" if request.priority == "MEDIUM" else "🟢"
-            subject = f"{priority_emoji} {request.priority} PRIORITY Request - {request.request_id}"
-            html_body = EmailService._create_email_html(request)
+            # Generate CIDs for images
+            header_cid = make_msgid()
+            icon_cid = make_msgid()
             
-            # Send email
+            # Create email content
+            # Handle Priority Enum
+            priority_value = request.priority.value if hasattr(request.priority, 'value') else str(request.priority)
+            if "Priority." in priority_value:
+                priority_value = priority_value.split('.')[-1]
+            
+            # Update: Use 🚨 for ALL priorities
+            priority_emoji = "🚨"
+            subject = f"{priority_emoji} {priority_value} PRIORITY Request - {request.request_id}"
+            
+            # Pass CIDs (stripping angle brackets for HTML src)
+            html_body = EmailService._create_email_html(
+                request, 
+                header_cid[1:-1], 
+                icon_cid[1:-1]
+            )
+            
             # Send email with attachments
             try:
                 # Define image paths
-                import os
                 # Current file: backend/app/services/email_service.py
                 # We need to go up 4 levels to reach project root: services -> app -> backend -> Tebita-SLA-System
                 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -99,13 +114,14 @@ class EmailService:
                     if os.path.exists(path):
                         with open(path, 'rb') as f:
                             img_data = f.read()
+                            # Pass the full CID (with brackets) for the header
                             return {"data": img_data, "cid": cid, "name": os.path.basename(path)}
                     return None
 
-                img1 = load_image(header_logo_path, "header_logo")
+                img1 = load_image(header_logo_path, header_cid)
                 if img1: images.append(img1)
                 
-                img2 = load_image(icon_image_path, "icon_image")
+                img2 = load_image(icon_image_path, icon_cid)
                 if img2: images.append(img2)
 
                 return EmailService._send_email(
@@ -136,7 +152,7 @@ class EmailService:
             return False
     
     @staticmethod
-    def _create_email_html(request: Request) -> str:
+    def _create_email_html(request: Request, header_cid: str, icon_cid: str) -> str:
         """Create HTML email body"""
         
         # Get department/division name
@@ -177,7 +193,7 @@ class EmailService:
                     <!-- Header -->
                     <tr>
                         <td align="center" bgcolor="#8B0000" style="padding: 30px 20px;">
-                            <img src="cid:header_logo" alt="Tebita Ambulance" width="220" style="display: block; max-width: 100%; height: auto;" />
+                            <img src="cid:{header_cid}" alt="Tebita Ambulance" width="220" style="display: block; max-width: 100%; height: auto;" />
                         </td>
                     </tr>
                     
@@ -188,7 +204,7 @@ class EmailService:
                                 <!-- Icon & Title -->
                                 <tr>
                                     <td align="center" style="padding-bottom: 20px;">
-                                        <img src="cid:icon_image" alt="Alert" width="80" style="display: block; max-width: 80px; height: auto;" />
+                                        <img src="cid:{icon_cid}" alt="Alert" width="80" style="display: block; max-width: 80px; height: auto;" />
                                     </td>
                                 </tr>
                                 <tr>
@@ -317,7 +333,8 @@ class EmailService:
                 for img in images:
                     try:
                         image_part = MIMEImage(img['data'], name=img['name'])
-                        image_part.add_header('Content-ID', f"<{img['cid']}>")
+                        # Use the CID exactly as provided (should include angle brackets)
+                        image_part.add_header('Content-ID', f"{img['cid']}")
                         image_part.add_header('Content-Disposition', 'inline', filename=img['name'])
                         msg.attach(image_part)
                     except Exception as e:

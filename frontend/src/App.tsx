@@ -23,6 +23,8 @@ import { SystemSettingsPage } from './pages/SystemSettingsPage';
 import VisualAnalyticsPage from './pages/VisualAnalyticsPage';
 import './index.css';
 
+
+
 function App() {
   return (
     <BrowserRouter>

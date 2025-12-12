@@ -16,6 +16,7 @@ export const SystemSettingsPage = () => {
         smtp_port: '587'
     });
     const [showSmtpForm, setShowSmtpForm] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     // Health Check State
     const [healthStatus, setHealthStatus] = useState<any>(null);
@@ -273,45 +274,91 @@ export const SystemSettingsPage = () => {
 
                             {showSmtpForm && (
                                 <form onSubmit={handleSaveSmtp} style={{
-                                    padding: '1.5rem',
-                                    background: '#f8f9fa',
-                                    borderRadius: '8px',
-                                    border: '1px solid #e9ecef'
+                                    marginTop: '1.5rem',
+                                    padding: '2rem',
+                                    background: '#ffffff',
+                                    borderRadius: '12px',
+                                    border: '1px solid #e2e8f0',
+                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
                                 }}>
-                                    <h3 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.1rem' }}>SMTP Configuration</h3>
-
-                                    <div className="form-group">
-                                        <label>Sender Email</label>
-                                        <input
-                                            type="email"
-                                            name="smtp_email"
-                                            value={smtpConfig.smtp_email}
-                                            onChange={handleSmtpChange}
-                                            className="form-control"
-                                            placeholder="e.g., notifications@tebita.com"
-                                            required
-                                        />
+                                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '1rem' }}>
+                                        <div style={{
+                                            width: '32px',
+                                            height: '32px',
+                                            borderRadius: '8px',
+                                            background: '#eff6ff',
+                                            color: '#3b82f6',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            marginRight: '0.75rem'
+                                        }}>
+                                            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                            </svg>
+                                        </div>
+                                        <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#1e293b' }}>SMTP Configuration</h3>
                                     </div>
 
-                                    <div className="form-group">
-                                        <label>App Password</label>
-                                        <input
-                                            type="password"
-                                            name="smtp_password"
-                                            value={smtpConfig.smtp_password}
-                                            onChange={handleSmtpChange}
-                                            className="form-control"
-                                            placeholder="Enter app password"
-                                            required
-                                        />
-                                        <small className="text-muted">
-                                            For Gmail, use an App Password, not your login password.
-                                        </small>
-                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                        <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#475569' }}>Sender Email</label>
+                                            <input
+                                                type="email"
+                                                name="smtp_email"
+                                                value={smtpConfig.smtp_email}
+                                                onChange={handleSmtpChange}
+                                                className="form-control"
+                                                placeholder="notifications@tebita.com"
+                                                required
+                                                style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                                            />
+                                        </div>
 
-                                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
+                                        <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#475569' }}>
+                                                App Password
+                                                <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: '#64748b', fontWeight: 'normal' }}>
+                                                    (Use an App Password for Gmail, not your login password)
+                                                </span>
+                                            </label>
+                                            <div style={{ position: 'relative' }}>
+                                                <input
+                                                    type={showPassword ? "text" : "password"}
+                                                    name="smtp_password"
+                                                    value={smtpConfig.smtp_password}
+                                                    onChange={handleSmtpChange}
+                                                    className="form-control"
+                                                    placeholder="Enter app password"
+                                                    required
+                                                    style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', paddingRight: '3rem' }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowPassword(!showPassword)}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        right: '0.75rem',
+                                                        top: '50%',
+                                                        transform: 'translateY(-50%)',
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        cursor: 'pointer',
+                                                        color: '#94a3b8'
+                                                    }}
+                                                >
+                                                    {showPassword ? (
+                                                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path></svg>
+                                                    ) : (
+                                                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                                    )}
+                                                </button>
+                                            </div>
+                                        </div>
+
                                         <div className="form-group">
-                                            <label>SMTP Host</label>
+                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#475569' }}>SMTP Host</label>
                                             <input
                                                 type="text"
                                                 name="smtp_host"
@@ -320,10 +367,12 @@ export const SystemSettingsPage = () => {
                                                 className="form-control"
                                                 placeholder="smtp.gmail.com"
                                                 required
+                                                style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                                             />
                                         </div>
+
                                         <div className="form-group">
-                                            <label>Port</label>
+                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#475569' }}>Port</label>
                                             <input
                                                 type="text"
                                                 name="smtp_port"
@@ -332,13 +381,32 @@ export const SystemSettingsPage = () => {
                                                 className="form-control"
                                                 placeholder="587"
                                                 required
+                                                style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                                             />
                                         </div>
                                     </div>
 
-                                    <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
-                                        <button type="submit" className="btn btn-primary" disabled={saving}>
-                                            {saving ? 'Saving...' : 'Save Configuration'}
+                                    <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline"
+                                            onClick={() => setShowSmtpForm(false)}
+                                            style={{ padding: '0.75rem 1.5rem' }}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="btn btn-primary"
+                                            disabled={saving}
+                                            style={{ padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                        >
+                                            {saving ? 'Saving...' : (
+                                                <>
+                                                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                                                    Save Configuration
+                                                </>
+                                            )}
                                         </button>
                                     </div>
                                 </form>

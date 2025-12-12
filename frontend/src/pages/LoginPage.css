@@ -294,3 +294,35 @@
     z-index: 20;
     opacity: 0.7;
 }
+
+.theme-toggle-btn {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    background: transparent;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    color: #000000;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 20;
+}
+
+.theme-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(15deg);
+}
+
+[data-theme='dark'] .theme-toggle-btn {
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+[data-theme='dark'] .theme-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}

@@ -85,6 +85,11 @@ async def get_email_notification_status(
     if not setting:
         return {"enabled": False, "message": "Email notifications not configured"}
     
+    return {
+        "enabled": setting.setting_value.lower() == "true",
+        "message": "Email notifications configured"
+    }
+    
 @router.put("/smtp-config")
 async def update_smtp_settings(
     config: Dict[str, str],

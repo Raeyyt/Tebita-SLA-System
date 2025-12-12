@@ -11,8 +11,13 @@ from .. import schemas
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
 
+from fastapi import Request as FastAPIRequest
+from ..limiter import limiter
+
 @router.post("/login", response_model=schemas.Token)
+@limiter.limit("5/minute")
 async def login(
+    request: FastAPIRequest,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):

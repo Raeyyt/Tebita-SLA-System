@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+
 import './LoginPage.css';
 
 export const LoginPage = () => {
     const navigate = useNavigate();
     const { login } = useAuth();
+
     const [formData, setFormData] = useState({
         username: '',
         password: '',
@@ -53,6 +55,8 @@ export const LoginPage = () => {
                     />
                     <p className="login-subtitle">Sign in to your account</p>
                 </div>
+
+
 
                 <form onSubmit={handleSubmit} className="login-form">
                     {error && (
@@ -140,9 +144,8 @@ export const LoginPage = () => {
                         }}
                     />
                 </div>
-                <div className="beta-version-label">Beta</div>
+                <div className="beta-version-label">v{__APP_VERSION__}</div>
             </div>
         </div>
-
     );
 };

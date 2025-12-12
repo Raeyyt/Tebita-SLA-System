@@ -383,7 +383,7 @@ export default function UserManagement() {
             <div className="spinner"></div>
           </div>
         ) : (
-          <table className="data-table">
+          <table className="data-table compact-table">
             <thead>
               <tr>
                 <th>Name</th>
@@ -408,31 +408,30 @@ export default function UserManagement() {
                     <td>{u.username}</td>
                     <td>{u.email}</td>
                     <td>
-                      <span className="badge badge-info">
+                      <span className="badge badge-info" style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}>
                         {u.role.replace(/_/g, ' ')}
                       </span>
                     </td>
                     <td>
-                      <span className={`badge ${u.is_active ? 'badge-success' : 'badge-error'}`}>
+                      <span className={`badge ${u.is_active ? 'badge-success' : 'badge-error'}`} style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}>
                         {u.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <button
-                        className="btn btn-outline"
+                        className="btn btn-outline btn-sm"
                         onClick={() => handleOpenModal(u)}
-                        style={{ marginRight: '0.5rem', padding: '0.5rem 1rem' }}
+                        style={{ marginRight: '0.5rem' }}
                       >
                         Edit
                       </button>
                       <button
-                        className="btn btn-outline"
+                        className="btn btn-outline btn-sm"
                         onClick={() => handleDeleteClick(u.id)}
                         disabled={u.id === user?.id}
                         style={{
                           color: 'var(--error)',
                           borderColor: 'var(--error)',
-                          padding: '0.5rem 1rem'
                         }}
                       >
                         Delete
@@ -445,6 +444,28 @@ export default function UserManagement() {
           </table>
         )}
       </div>
+
+      <style>{`
+        .compact-table th,
+        .compact-table td {
+          padding: 0.5rem 0.75rem !important;
+          font-size: 0.9rem;
+        }
+        
+        .compact-table th {
+          font-weight: 600;
+          background: #f8f9fa;
+          text-transform: uppercase;
+          font-size: 0.75rem;
+          letter-spacing: 0.05em;
+        }
+
+        .btn-sm {
+          padding: 0.25rem 0.5rem !important;
+          font-size: 0.8rem !important;
+          line-height: 1.2;
+        }
+      `}</style>
 
       {/* Add/Edit Modal */}
       {showModal && (

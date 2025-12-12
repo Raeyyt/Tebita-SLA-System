@@ -15,7 +15,18 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 # ... imports ...
 
+# Rate Limiting
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from .limiter import limiter
+
 app = FastAPI(title=settings.app_name)
+
+# Initialize Limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # Trusted Host Middleware
 app.add_middleware(
