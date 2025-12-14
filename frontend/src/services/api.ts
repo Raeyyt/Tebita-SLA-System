@@ -97,6 +97,27 @@ export const api = {
         return response.data;
     },
 
+    rejectRequest: async (
+        token: string,
+        id: number,
+        reason: string
+    ): Promise<Request> => {
+        const response = await client.post<Request>(
+            `/requests/${id}/reject`,
+            null, // Reason is passed as query param in the backend endpoint definition? Wait, let me check backend.
+            // Backend: async def reject_request(request_id: int, reason: str, ...)
+            // It expects 'reason' as a query parameter by default if not specified as Body.
+            // Let's check backend/app/routers/requests.py again.
+            // It says: async def reject_request(request_id: int, reason: str, ...)
+            // This means it's a query parameter.
+            {
+                ...withAuth(token),
+                params: { reason }
+            }
+        );
+        return response.data;
+    },
+
     getProfile: async (token: string): Promise<User> => {
         const response = await client.get<User>('/auth/me', withAuth(token));
         return response.data;

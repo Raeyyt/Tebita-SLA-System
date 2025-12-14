@@ -329,6 +329,7 @@ class Request(Base):
     actual_response_time = Column(DateTime(timezone=True))  # When first action was taken
     actual_completion_time = Column(DateTime(timezone=True))  # When request was completed
     reason_for_delay = Column(Text)  # Explanation if SLA was missed
+    rejection_reason = Column(Text)  # Reason for rejection
     
     # Cost tracking (for M&E cost optimization KPIs)
     cost_estimate = Column(Numeric(10, 2))  # Estimated cost in Birr

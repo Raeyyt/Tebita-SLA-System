@@ -108,7 +108,7 @@ export const KPIsPage = () => {
                 <>
                     {/* Overview Cards */}
                     {dashboard && (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1.5rem', marginBottom: '2rem' }}>
                             <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid #B67E7D' }}>
                                 <div style={{ color: '#6b7280', fontSize: '0.875rem', fontWeight: 500 }}>Total Requests</div>
                                 <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#111827', marginTop: '0.5rem' }}>{dashboard.total_requests}</div>
@@ -130,6 +130,11 @@ export const KPIsPage = () => {
                                 <div style={{ color: '#6b7280', fontSize: '0.875rem', fontWeight: 500 }}>Satisfaction Score</div>
                                 <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#111827', marginTop: '0.5rem' }}>{dashboard.satisfaction_avg || 'N/A'}</div>
                                 <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>Out of 5.0</div>
+                            </div>
+                            <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid #EF4444' }}>
+                                <div style={{ color: '#6b7280', fontSize: '0.875rem', fontWeight: 500 }}>Rejection Rate</div>
+                                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#111827', marginTop: '0.5rem' }}>{dashboard.rejection_rate}%</div>
+                                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>Of Total Requests</div>
                             </div>
                         </div>
                     )}

@@ -93,7 +93,7 @@ def generate_request_export_csv(db: Session, start_date: datetime, end_date: dat
         'Recipient Division', 'Recipient Department', 'Recipient Name',
         'Created At', 'Submitted At', 'Acknowledged At', 
         'Completed At', 'Validated At',
-        'SLA Deadline', 'Actual Completion (Hrs)', 'SLA Status'
+        'SLA Deadline', 'Actual Completion (Hrs)', 'SLA Status', 'Rejection Reason'
     ])
     
     # Data
@@ -133,7 +133,8 @@ def generate_request_export_csv(db: Session, start_date: datetime, end_date: dat
             format_datetime_for_export(req.completion_validated_at),
             format_datetime_for_export(req.sla_completion_deadline),
             actual_hours,
-            calculate_sla_status(req)
+            calculate_sla_status(req),
+            req.rejection_reason or ""
         ])
         
     output.seek(0)

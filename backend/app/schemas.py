@@ -188,6 +188,7 @@ class RequestRead(RequestBase):
     approved_at: Optional[datetime]
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
+    rejection_reason: Optional[str] = None
     
     # Acknowledgement fields
     acknowledged_at: Optional[datetime] = None

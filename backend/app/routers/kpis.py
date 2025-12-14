@@ -260,12 +260,17 @@ async def get_kpi_dashboard(
     # Calculate satisfaction score
     satisfaction_score = calculate_customer_satisfaction_score(db, start_date=month_start, end_date=now)
     
+    # Calculate rejection rate
+    rejected_count = len([r for r in requests if r.status == RequestStatus.REJECTED])
+    rejection_rate = (rejected_count / total * 100) if total > 0 else 0
+
     return {
         "total_requests": total,
         "avg_response_time": 0,  # Placeholder
         "avg_completion_time": round(avg_completion, 2),
         "sla_compliance_rate": round(sla_rate, 2),
         "satisfaction_avg": round(satisfaction_score, 1),
+        "rejection_rate": round(rejection_rate, 1),
     }
 
 

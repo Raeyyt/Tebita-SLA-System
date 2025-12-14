@@ -129,7 +129,8 @@ async def get_incoming_requests(
     query = query.filter(Request.status.in_([
         RequestStatus.PENDING, 
         RequestStatus.IN_PROGRESS,
-        RequestStatus.COMPLETED
+        RequestStatus.COMPLETED,
+        RequestStatus.REJECTED
     ]))
     
     return query.order_by(Request.submitted_at.desc()).all()
@@ -730,6 +731,8 @@ async def reject_request(
         raise HTTPException(status_code=404, detail="Request not found")
     
     request.status = RequestStatus.REJECTED
+    request.rejection_reason = reason
+    request.completed_at = datetime.utcnow()
     
     # Add workflow entry
     workflow = RequestWorkflow(

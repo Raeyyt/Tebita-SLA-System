@@ -85,6 +85,7 @@ export interface Request {
     notes?: string;
     attachments?: any;
     items?: RequestItem[];
+    rejection_reason?: string;
 
     // Nested relationship data for sender/recipient display
     requester?: User;

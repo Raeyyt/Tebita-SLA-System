@@ -347,6 +347,40 @@ export const RequestViewPage = () => {
                 </div>
             </div>
 
+            {/* Rejection Alert */}
+            {request.status === 'REJECTED' && (
+                <div style={{
+                    margin: '2rem 2rem 0 2rem',
+                    padding: '1.5rem',
+                    background: '#FEF2F2',
+                    border: '1px solid #FECACA',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '1rem'
+                }}>
+                    <div style={{ fontSize: '1.5rem' }}>🚫</div>
+                    <div>
+                        <h3 style={{
+                            margin: '0 0 0.5rem 0',
+                            color: '#991B1B',
+                            fontSize: '1.1rem',
+                            fontWeight: '700'
+                        }}>
+                            Request Rejected
+                        </h3>
+                        <p style={{
+                            margin: 0,
+                            color: '#7F1D1D',
+                            fontSize: '0.95rem',
+                            lineHeight: '1.5'
+                        }}>
+                            <strong>Reason:</strong> {request.rejection_reason || 'No reason provided.'}
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {/* Sender/Recipient Section */}
             <div style={{
                 display: 'grid',

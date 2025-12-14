@@ -27,6 +27,17 @@ from ..kpi_calculator import (
 )
 from ..scorecard_calculator import calculate_integration_index
 
+def calculate_rejection_rate(db: Session, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None) -> float:
+    query = db.query(Request)
+    if start_date: query = query.filter(Request.created_at >= start_date)
+    if end_date: query = query.filter(Request.created_at <= end_date)
+    
+    total = query.count()
+    if total == 0: return 0.0
+    
+    rejected = query.filter(Request.status == RequestStatus.REJECTED).count()
+    return (rejected / total) * 100.0
+
 router = APIRouter(prefix="/visual-analytics", tags=["visual-analytics"])
 
 
@@ -68,7 +79,8 @@ async def get_visual_dashboard_data(
         "satisfaction": calculate_customer_satisfaction_score(db, None, custom_start, custom_end),
         "integration_index": integration_data.get("integration_index", 0),
         "resource_optimization": 85.0, # Placeholder (Demo Value)
-        "avg_cost_per_request": 0.0 # Placeholder (Requires Finance Module)
+        "avg_cost_per_request": 0.0, # Placeholder (Requires Finance Module)
+        "rejection_rate": calculate_rejection_rate(db, custom_start, custom_end)
     }
     
     # Calculate all chart data

@@ -95,11 +95,16 @@ def calculate_kpi_metrics(db: Session, department_id: int = None, division_id: i
     medium_priority = query.filter(Request.priority == Priority.MEDIUM).count()
     low_priority = query.filter(Request.priority == Priority.LOW).count()
 
+    # 5. Rejection Rate
+    rejected_count = query.filter(Request.status == RequestStatus.REJECTED).count()
+    rejection_rate = (rejected_count / total_requests * 100) if total_requests > 0 else 0
+
     return {
         "total_requests": total_requests,
         "sla_compliance_rate": round(compliance_rate, 1),
         "avg_resolution_time_hours": avg_hours,
         "pending_requests": pending_count,
+        "rejection_rate": round(rejection_rate, 1),
         "priority_breakdown": {
             "high": high_priority,
             "medium": medium_priority,

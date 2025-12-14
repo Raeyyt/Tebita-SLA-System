@@ -81,6 +81,7 @@ interface DashboardData {
         integration_index: number;
         resource_optimization: number;
         avg_cost_per_request: number;
+        rejection_rate?: number;
     };
 }
 
@@ -318,7 +319,7 @@ const VisualAnalyticsPage: React.FC = () => {
                 {/* Metric Cards Row */}
                 <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(4, 1fr)',
+                    gridTemplateColumns: 'repeat(5, 1fr)',
                     gap: '1.5rem',
                     marginBottom: '2rem'
                 }}>
@@ -451,6 +452,39 @@ const VisualAnalyticsPage: React.FC = () => {
                         </div>
                         <div style={{ fontSize: '0.8rem', color: COLORS.primary }}>
                             {data.summary_kpis.fulfillment_rate.toFixed(1)}% completion rate
+                        </div>
+                    </div>
+
+                    {/* Rejection Rate */}
+                    <div style={{
+                        background: 'white',
+                        borderRadius: '12px',
+                        padding: '1.5rem',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                        borderTop: `4px solid #EF4444`
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                            <div style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '8px',
+                                background: '#FEF2F2',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '1.25rem',
+                                color: '#EF4444',
+                                fontWeight: 'bold'
+                            }}>
+                                🚫
+                            </div>
+                            <span style={{ color: COLORS.textLight, fontSize: '0.85rem' }}>Rejection Rate</span>
+                        </div>
+                        <div style={{ fontSize: '2rem', fontWeight: 700, color: COLORS.dark, marginBottom: '0.25rem' }}>
+                            {data.summary_kpis.rejection_rate ? data.summary_kpis.rejection_rate.toFixed(1) : '0.0'}%
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#EF4444' }}>
+                            Of total volume
                         </div>
                     </div>
                 </div>

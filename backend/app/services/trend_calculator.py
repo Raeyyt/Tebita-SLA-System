@@ -82,6 +82,7 @@ def calculate_request_volume_trend(
     total_data = {label: 0 for label in labels}
     pending_data = {label: 0 for label in labels}
     completed_data = {label: 0 for label in labels}
+    rejected_data = {label: 0 for label in labels}
     
     # Aggregate by time period
     for request in requests:
@@ -100,13 +101,16 @@ def calculate_request_volume_trend(
                 pending_data[label] += 1
             elif request.status == RequestStatus.COMPLETED:
                 completed_data[label] += 1
+            elif request.status == RequestStatus.REJECTED:
+                rejected_data[label] += 1
     
     return {
         "labels": labels,
         "datasets": [
             {"label": "Total Requests", "data": [total_data[l] for l in labels]},
             {"label": "Pending", "data": [pending_data[l] for l in labels]},
-            {"label": "Completed", "data": [completed_data[l] for l in labels]}
+            {"label": "Completed", "data": [completed_data[l] for l in labels]},
+            {"label": "Rejected", "data": [rejected_data[l] for l in labels]}
         ]
     }
 
