@@ -174,7 +174,7 @@ try:
         full_name="M&E Officer",
         email="me@tebita.com",
         hashed_password=get_password_hash("me123"),
-        role=UserRole.ME_STAFF,
+        role=UserRole.ADMIN,
         is_active=True
     )
     db.add(me_staff)
@@ -185,7 +185,7 @@ try:
         full_name="EMS Division Manager",
         email="ems@tebita.com",
         hashed_password=get_password_hash("ems123"),
-        role=UserRole.DIVISION_STAFF,
+        role=UserRole.DIVISION_MANAGER,
         division_id=ems_division.id,
         is_active=True
     )
@@ -197,7 +197,7 @@ try:
         full_name="HR Manager",
         email="hr@tebita.com",
         hashed_password=get_password_hash("hr123"),
-        role=UserRole.SUPPORT_STAFF,
+        role=UserRole.DIVISION_MANAGER,
         division_id=hr.id,
         is_active=True
     )
