@@ -35,11 +35,33 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 
 def authenticate_user(db: Session, username: str, password: str) -> Optional[User]:
+    import os
+    import logging
+    
+    # Configure logging to file
+    logging.basicConfig(filename='auth_debug.log', level=logging.INFO, 
+                        format='%(asctime)s - %(message)s')
+    
+    logging.info(f"--- AUTHENTICATE_USER CALLED ---")
+    logging.info(f"CWD: {os.getcwd()}")
+    logging.info(f"Username: {username}")
+    
     user = db.query(User).filter(User.username == username).first()
     if not user:
+        logging.error(f"User '{username}' NOT FOUND in DB")
+        # Log all users in DB for debugging
+        all_users = db.query(User).all()
+        logging.info(f"Existing users: {[u.username for u in all_users]}")
         return None
+        
+    logging.info(f"User found: {user.username}, ID: {user.id}, Role: {user.role}")
+    logging.info(f"Stored Hash: {user.hashed_password}")
+    
     if not verify_password(password, user.hashed_password):
+        logging.error("Password verification FAILED")
         return None
+        
+    logging.info("Authentication SUCCESS")
     return user
 
 

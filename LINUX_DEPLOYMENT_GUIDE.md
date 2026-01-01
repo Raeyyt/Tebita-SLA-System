@@ -21,7 +21,7 @@ We need Python, Node.js, PostgreSQL, Nginx (web server), and Git.
 
 ### 2.1 Install Python & Tools
 ```bash
-sudo apt install -y python3-pip python3-venv git curl build-essential libpq-dev
+sudo apt install -y python3-pip python3-venv git curl build-essential libpq-dev nano ufw
 ```
 
 ### 2.2 Install Node.js (Version 20)
@@ -87,18 +87,24 @@ Create the `.env` file.
 ```bash
 nano .env
 ```
-Paste your production settings:
+Paste your production settings (make sure to use `localhost` for the database host):
 ```ini
 DATABASE_URL=postgresql://tebita_user:secure_password@localhost/tebita_sla
 APP_SECRET_KEY=your_generated_secret_key
 # ... add other settings from .env.example
 ```
+> [!IMPORTANT]
+> Ensure `DATABASE_URL` uses `@localhost/` if PostgreSQL is running on the same server. Do not use `server` or other placeholders unless you have a remote database.
+
 *Save and exit (Ctrl+O, Enter, Ctrl+X).*
 
 ### 4.4 Initialize Database
+This will create the tables and seed initial data (divisions, departments, and admin users).
 ```bash
-python create_admin.py
+PYTHONPATH=. python scripts/init_db.py
 ```
+
+
 
 ### 4.5 Setup Systemd Service (Auto-Start)
 Create a service file to keep the backend running.

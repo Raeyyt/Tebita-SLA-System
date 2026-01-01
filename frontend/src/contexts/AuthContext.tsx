@@ -21,30 +21,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const loadUser = async () => {
-            if (token) {
+        const initAuth = async () => {
+            const storedToken = localStorage.getItem('token');
+            if (storedToken) {
                 try {
-                    const userData = await api.getProfile(token);
+                    const userData = await api.getProfile(storedToken);
                     setUser(userData);
+                    setToken(storedToken);
                 } catch (error) {
                     console.error('Failed to load user:', error);
                     localStorage.removeItem('token');
                     setToken(null);
+                    setUser(null);
                 }
             }
             setLoading(false);
         };
 
-        loadUser();
-    }, [token]);
+        initAuth();
+    }, []);
 
     const login = async (username: string, password: string) => {
+        // 1. Get token
         const { access_token } = await api.login(username, password);
+        
+        // 2. Set token in storage and state
         localStorage.setItem('token', access_token);
         setToken(access_token);
 
-        const userData = await api.getProfile(access_token);
-        setUser(userData);
+        // 3. Fetch user profile immediately
+        try {
+            const userData = await api.getProfile(access_token);
+            setUser(userData);
+        } catch (error) {
+            // If profile fetch fails, rollback login
+            localStorage.removeItem('token');
+            setToken(null);
+            setUser(null);
+            throw error;
+        }
     };
 
     const logout = () => {

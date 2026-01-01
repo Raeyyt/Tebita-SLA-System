@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
 
 
 class Settings(BaseSettings):
@@ -7,7 +8,7 @@ class Settings(BaseSettings):
     
     app_name: str = "Tebita SLA System"
     app_version: str = "1.0.0-rc.1"
-    secret_key: str = "tebita-sla-secret-key-change-in-production"
+    secret_key: str = Field(validation_alias="APP_SECRET_KEY")
     access_token_expire_minutes: int = 480  # 8 hours
     algorithm: str = "HS256"
     
@@ -33,6 +34,10 @@ class Settings(BaseSettings):
         # Local network access
         "http://192.168.100.88:5173",
         "http://192.168.100.88:8000",
+        "http://172.20.10.2:5173",
+        "http://172.20.10.2:8000",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
     ]
     
     # Celery/Redis

@@ -7,10 +7,10 @@ export const getApiUrl = () => {
     if (import.meta.env.VITE_API_URL) {
         return import.meta.env.VITE_API_URL;
     }
-    // 2. Fallback to current hostname (for local network access)
-    // Assumes backend is on port 8000 of the same machine
-    return `http://${window.location.hostname}:8000`;
+    // 2. Fallback to relative paths (for Nginx proxying)
+    return '';
 };
+
 
 const API_BASE = getApiUrl();
 
