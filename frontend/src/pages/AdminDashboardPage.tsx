@@ -106,7 +106,7 @@ export const AdminDashboardPage = () => {
                                 background: '#e74c3c',
                                 boxShadow: '0 0 0 2px rgba(231, 76, 60, 0.2)'
                             }}></span>
-                            Real-Time SLA Engine
+                            Real-Time SLA Engine (v2.1)
                         </h3>
                         <span style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>Auto-refreshing every 30s</span>
                     </div>
