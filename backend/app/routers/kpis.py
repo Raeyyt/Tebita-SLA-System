@@ -218,6 +218,12 @@ async def get_kpi_dashboard(
             "avg_completion_time": 0,
             "sla_compliance_rate": 0,
             "satisfaction_avg": 0,
+            "rejection_rate": 0,
+            "priority_breakdown": {
+                "high": 0,
+                "medium": 0,
+                "low": 0
+            }
         }
     
     # Calculate metrics

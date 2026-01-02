@@ -26,6 +26,7 @@ def calculate_kpi_metrics(db: Session, department_id: int = None, division_id: i
             "sla_compliance_rate": 100,
             "avg_resolution_time_hours": 0,
             "pending_requests": 0,
+            "rejection_rate": 0,
             "priority_breakdown": {
                 "high": 0,
                 "medium": 0,
