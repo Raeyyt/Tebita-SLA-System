@@ -44,7 +44,7 @@ async def get_request_sla_status(
     current_user: User = Depends(get_current_active_user)
 ):
     """Get current SLA status and compliance info for a request"""
-    from ..sla_utils import get_sla_status, check_sla_compliance
+    from ..services.sla_utils import get_sla_status, check_sla_compliance
     
     request = db.get(Request, request_id)
     if not request:

@@ -20,12 +20,12 @@ from ..services.trend_calculator import (
     calculate_satisfaction_trend,
     calculate_service_efficiency_trend,
 )
-from ..kpi_calculator import (
+from ..services.kpi_calculator import (
     calculate_sla_compliance_rate,
     calculate_service_request_fulfillment_rate,
     calculate_customer_satisfaction_score
 )
-from ..scorecard_calculator import calculate_integration_index
+from ..services.scorecard_calculator import calculate_integration_index
 
 def calculate_rejection_rate(db: Session, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None) -> float:
     query = db.query(Request)

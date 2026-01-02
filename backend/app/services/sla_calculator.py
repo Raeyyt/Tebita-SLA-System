@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from app.models import Request, RequestStatus
 from .sla_policy import get_sla_standards
-from app.sla_utils import get_sla_policy
+from .sla_utils import get_sla_policy
 
 def calculate_deadlines(request: Request, db: Session = None):
     """

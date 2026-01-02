@@ -11,9 +11,8 @@ from datetime import datetime, timedelta
 from ..database import get_db
 from ..auth import get_current_active_user
 from ..models import User
-from ..kpi_calculator import *
-from ..scorecard_calculator import (
-    calculate_overall_scorecard,
+from ..services.kpi_calculator import *
+from ..services.scorecard_calculator import (
     calculate_overall_scorecard,
     calculate_integration_index
 )
