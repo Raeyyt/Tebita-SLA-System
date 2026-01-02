@@ -113,26 +113,26 @@ export const AdminDashboardPage = () => {
                     <div style={{ padding: '1.5rem' }}>
                         <div className="grid grid-4" style={{ gap: '1.5rem' }}>
                             <div style={{ textAlign: 'center' }}>
-                                <div style={{ fontSize: '2rem', fontWeight: '700', color: kpis.sla_compliance_rate >= 90 ? 'var(--success)' : 'var(--warning)' }}>
-                                    {kpis.sla_compliance_rate}%
+                                <div style={{ fontSize: '2rem', fontWeight: '700', color: (kpis.sla_compliance_rate ?? 0) >= 90 ? 'var(--success)' : 'var(--warning)' }}>
+                                    {kpis.sla_compliance_rate ?? 0}%
                                 </div>
                                 <div style={{ fontSize: '0.9rem', color: 'var(--gray-600)' }}>SLA Compliance</div>
                             </div>
                             <div style={{ textAlign: 'center' }}>
                                 <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--primary)' }}>
-                                    {kpis.avg_resolution_time_hours}h
+                                    {kpis.avg_resolution_time_hours ?? 0}h
                                 </div>
                                 <div style={{ fontSize: '0.9rem', color: 'var(--gray-600)' }}>Avg Resolution</div>
                             </div>
                             <div style={{ textAlign: 'center' }}>
                                 <div style={{ fontSize: '2rem', fontWeight: '700', color: '#e74c3c' }}>
-                                    {kpis.priority_breakdown.high}
+                                    {kpis.priority_breakdown?.high ?? 0}
                                 </div>
                                 <div style={{ fontSize: '0.9rem', color: 'var(--gray-600)' }}>High Priority</div>
                             </div>
                             <div style={{ textAlign: 'center' }}>
                                 <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--gray-700)' }}>
-                                    {kpis.pending_requests}
+                                    {kpis.pending_requests ?? 0}
                                 </div>
                                 <div style={{ fontSize: '0.9rem', color: 'var(--gray-600)' }}>Active Requests</div>
                             </div>
