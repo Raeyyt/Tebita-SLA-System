@@ -7,9 +7,19 @@ export const getApiUrl = () => {
     if (import.meta.env.VITE_API_URL) {
         return import.meta.env.VITE_API_URL;
     }
-    // 2. Fallback to relative paths (for Nginx proxying)
+
+    // 2. If running on localhost (Dev), use absolute URL to port 8000
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        // Only use absolute URL if we are NOT on the production port (8080)
+        if (window.location.port !== '8080') {
+            return `http://${window.location.hostname}:8000`;
+        }
+    }
+
+    // 3. Fallback to relative paths (for Nginx proxying in production)
     return '';
 };
+
 
 
 const API_BASE = getApiUrl();
