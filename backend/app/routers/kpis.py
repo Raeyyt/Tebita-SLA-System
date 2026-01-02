@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from ..database import get_db
 from ..auth import get_current_active_user
-from ..models import Request, User, Division, Department, RequestStatus, KPIMetric, Scorecard, ScoreRating, UserRole
+from ..models import Request, User, Division, Department, RequestStatus, KPIMetric, Scorecard, ScoreRating, UserRole, Priority
 from .. import schemas
 from ..services.kpi_calculator import calculate_kpi_metrics, calculate_overdue_requests, calculate_customer_satisfaction_score  # NEW: Import KPI service
 from ..services.access_control import apply_role_based_filtering
