@@ -264,6 +264,11 @@ async def get_kpi_dashboard(
     rejected_count = len([r for r in requests if r.status == RequestStatus.REJECTED])
     rejection_rate = (rejected_count / total * 100) if total > 0 else 0
 
+    # Calculate priority breakdown
+    high_priority = len([r for r in requests if r.priority == Priority.HIGH])
+    medium_priority = len([r for r in requests if r.priority == Priority.MEDIUM])
+    low_priority = len([r for r in requests if r.priority == Priority.LOW])
+
     return {
         "total_requests": total,
         "avg_response_time": 0,  # Placeholder
@@ -271,7 +276,13 @@ async def get_kpi_dashboard(
         "sla_compliance_rate": round(sla_rate, 2),
         "satisfaction_avg": round(satisfaction_score, 1),
         "rejection_rate": round(rejection_rate, 1),
+        "priority_breakdown": {
+            "high": high_priority,
+            "medium": medium_priority,
+            "low": low_priority
+        }
     }
+
 
 
 def calculate_realtime_kpis(db: Session, start: datetime, end: datetime, division_id: int = None, department_id: int = None):
