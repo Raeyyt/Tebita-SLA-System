@@ -16,8 +16,8 @@ export const getApiUrl = () => {
         }
     }
 
-    // 3. Fallback to relative paths (for Nginx proxying in production)
-    return '';
+    // 3. Fallback to relative paths with /api prefix (for Nginx proxying in production)
+    return '/api';
 };
 
 
@@ -134,7 +134,7 @@ export const api = {
     },
 
     getDashboardStats: async (token: string) => {
-        const response = await client.get('/api/dashboard/stats', withAuth(token));
+        const response = await client.get('/dashboard/stats', withAuth(token));
         return response.data;
     },
 
@@ -217,7 +217,7 @@ export const api = {
             path: string;
             type: string;
             size: number;
-        }>('/api/uploads/item-file', formData, {
+        }>('/uploads/item-file', formData, {
             headers: {
                 ...withAuth(token).headers,
             },
@@ -226,7 +226,7 @@ export const api = {
     },
 
     downloadItemFile: async (token: string, filename: string) => {
-        const response = await client.get(`/api/uploads/item-file/${filename}`, {
+        const response = await client.get(`/uploads/item-file/${filename}`, {
             ...withAuth(token),
             responseType: 'blob',
         });

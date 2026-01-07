@@ -146,7 +146,7 @@ export const AdminDashboardPage = () => {
                 <div className="card">
                     <div style={{ padding: '1.5rem', textAlign: 'center' }}>
                         <div style={{ fontSize: '2.5rem', fontWeight: '700', color: 'var(--primary)' }}>
-                            {data.summary.total_requests}
+                            {data?.summary?.total_requests ?? 0}
                         </div>
                         <p className="text-muted">Total Requests</p>
                     </div>
@@ -154,7 +154,7 @@ export const AdminDashboardPage = () => {
                 <div className="card">
                     <div style={{ padding: '1.5rem', textAlign: 'center' }}>
                         <div style={{ fontSize: '2.5rem', fontWeight: '700', color: 'var(--warning)' }}>
-                            {data.summary.pending}
+                            {data?.summary?.pending ?? 0}
                         </div>
                         <p className="text-muted">Pending</p>
                     </div>
@@ -162,7 +162,7 @@ export const AdminDashboardPage = () => {
                 <div className="card">
                     <div style={{ padding: '1.5rem', textAlign: 'center' }}>
                         <div style={{ fontSize: '2.5rem', fontWeight: '700', color: 'var(--info)' }}>
-                            {data.summary.in_progress}
+                            {data?.summary?.in_progress ?? 0}
                         </div>
                         <p className="text-muted">In Progress</p>
                     </div>
@@ -170,7 +170,7 @@ export const AdminDashboardPage = () => {
                 <div className="card">
                     <div style={{ padding: '1.5rem', textAlign: 'center' }}>
                         <div style={{ fontSize: '2.5rem', fontWeight: '700', color: 'var(--success)' }}>
-                            {data.summary.completed}
+                            {data?.summary?.completed ?? 0}
                         </div>
                         <p className="text-muted">Completed</p>
                     </div>
@@ -184,14 +184,14 @@ export const AdminDashboardPage = () => {
                 </div>
                 <div style={{ padding: '1.5rem' }}>
                     <div className="grid grid-3" style={{ gap: '1rem' }}>
-                        {data.divisions.map(div => (
+                        {(data?.divisions ?? []).map(div => (
                             <div key={div.id} className="card">
                                 <div style={{ padding: '1.5rem' }}>
                                     <div style={{ fontWeight: '600', fontSize: '1.1rem', marginBottom: '0.5rem' }}>
                                         {div.name}
                                     </div>
                                     <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--primary)' }}>
-                                        {div.total_requests} <span style={{ fontSize: '0.875rem', color: 'var(--gray-500)' }}>requests</span>
+                                        {div.total_requests ?? 0} <span style={{ fontSize: '0.875rem', color: 'var(--gray-500)' }}>requests</span>
                                     </div>
                                 </div>
                             </div>
@@ -207,14 +207,14 @@ export const AdminDashboardPage = () => {
                 </div>
                 <div style={{ padding: '1.5rem' }}>
                     <div className="grid grid-4" style={{ gap: '1rem' }}>
-                        {data.departments.map(dept => (
+                        {(data?.departments ?? []).map(dept => (
                             <div key={dept.id} className="card">
                                 <div style={{ padding: '1rem' }}>
                                     <div style={{ fontWeight: '600', fontSize: '0.95rem', marginBottom: '0.5rem' }}>
                                         {dept.name}
                                     </div>
                                     <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--primary)' }}>
-                                        {dept.total_requests}
+                                        {dept.total_requests ?? 0}
                                     </div>
                                 </div>
                             </div>

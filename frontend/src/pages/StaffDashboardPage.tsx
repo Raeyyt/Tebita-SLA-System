@@ -61,7 +61,7 @@ export const StaffDashboardPage = () => {
                     </div>
                     <div style={{ padding: '2rem', textAlign: 'center' }}>
                         <div style={{ fontSize: '3rem', fontWeight: '700', color: 'var(--primary)' }}>
-                            {data.summary.sent_requests}
+                            {data?.summary?.sent_requests ?? 0}
                         </div>
                         <p className="text-muted">Total requests submitted</p>
                         <Link to="/requests/sent" className="btn btn-outline" style={{ marginTop: '1rem' }}>
@@ -76,7 +76,7 @@ export const StaffDashboardPage = () => {
                     </div>
                     <div style={{ padding: '2rem', textAlign: 'center' }}>
                         <div style={{ fontSize: '3rem', fontWeight: '700', color: 'var(--success)' }}>
-                            {data.summary.received_requests}
+                            {data?.summary?.received_requests ?? 0}
                         </div>
                         <p className="text-muted">Requests to my unit</p>
                         <Link to="/requests/inbox" className="btn btn-outline" style={{ marginTop: '1rem' }}>
@@ -91,7 +91,7 @@ export const StaffDashboardPage = () => {
                     </div>
                     <div style={{ padding: '2rem', textAlign: 'center' }}>
                         <div style={{ fontSize: '3rem', fontWeight: '700', color: 'var(--warning)' }}>
-                            {data.summary.pending_to_handle}
+                            {data?.summary?.pending_to_handle ?? 0}
                         </div>
                         <p className="text-muted">Awaiting your response</p>
                         <Link to="/requests/inbox" className="btn btn-primary" style={{ marginTop: '1rem' }}>

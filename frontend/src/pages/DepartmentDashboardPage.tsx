@@ -61,7 +61,7 @@ export const DepartmentDashboardPage = () => {
                 <div className="card">
                     <div style={{ padding: '1.5rem', textAlign: 'center' }}>
                         <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--primary)' }}>
-                            {data.summary.total_requests}
+                            {data?.summary?.total_requests ?? 0}
                         </div>
                         <p className="text-muted">Total Requests</p>
                     </div>
@@ -69,7 +69,7 @@ export const DepartmentDashboardPage = () => {
                 <div className="card">
                     <div style={{ padding: '1.5rem', textAlign: 'center' }}>
                         <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--warning)' }}>
-                            {data.summary.pending}
+                            {data?.summary?.pending ?? 0}
                         </div>
                         <p className="text-muted">Pending</p>
                     </div>
@@ -77,7 +77,7 @@ export const DepartmentDashboardPage = () => {
                 <div className="card">
                     <div style={{ padding: '1.5rem', textAlign: 'center' }}>
                         <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--info)' }}>
-                            {data.summary.in_progress}
+                            {data?.summary?.in_progress ?? 0}
                         </div>
                         <p className="text-muted">In Progress</p>
                     </div>
@@ -85,7 +85,7 @@ export const DepartmentDashboardPage = () => {
                 <div className="card">
                     <div style={{ padding: '1.5rem', textAlign: 'center' }}>
                         <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--success)' }}>
-                            {data.summary.completed}
+                            {data?.summary?.completed ?? 0}
                         </div>
                         <p className="text-muted">Completed</p>
                     </div>
@@ -98,9 +98,9 @@ export const DepartmentDashboardPage = () => {
                     <h3 className="card-title">Sub-Department Performance</h3>
                 </div>
                 <div style={{ padding: '1.5rem' }}>
-                    {data.subdepartments.length > 0 ? (
+                    {(data?.subdepartments?.length ?? 0) > 0 ? (
                         <div className="grid grid-2" style={{ gap: '1rem' }}>
-                            {data.subdepartments.map(subdept => (
+                            {(data?.subdepartments ?? []).map(subdept => (
                                 <div key={subdept.id} className="card">
                                     <div style={{ padding: '1.5rem' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -114,7 +114,7 @@ export const DepartmentDashboardPage = () => {
                                             </div>
                                             <div style={{ textAlign: 'right' }}>
                                                 <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--primary)' }}>
-                                                    {subdept.total_requests}
+                                                    {subdept.total_requests ?? 0}
                                                 </div>
                                                 <div className="text-muted" style={{ fontSize: '0.75rem' }}>
                                                     requests
