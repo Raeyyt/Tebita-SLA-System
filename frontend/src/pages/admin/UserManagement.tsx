@@ -94,6 +94,7 @@ export default function UserManagement() {
       setDepartments(departmentsData);
     } catch (err) {
       console.error('Failed to fetch organizational data:', err);
+      showNotification('Failed to load divisions/departments. Check connection.', 'error');
     }
   };
 
@@ -369,7 +370,7 @@ export default function UserManagement() {
 
       <div className="card-header">
         <div>
-          <h1 className="card-title">User Management</h1>
+          <h1 className="card-title">User Management (v2.2)</h1>
           <p className="text-muted">{users.length} users in system</p>
         </div>
         <button className="btn btn-primary" onClick={() => handleOpenModal()}>

@@ -10,7 +10,7 @@ from .. import schemas
 router = APIRouter(prefix="/divisions", tags=["divisions"])
 
 
-@router.get("/", response_model=List[schemas.DivisionRead])
+@router.get("", response_model=List[schemas.DivisionRead])
 async def get_divisions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -20,7 +20,7 @@ async def get_divisions(
     return divisions
 
 
-@router.post("/", response_model=schemas.DivisionRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=schemas.DivisionRead, status_code=status.HTTP_201_CREATED)
 async def create_division(
     division_in: schemas.DivisionCreate,
     db: Session = Depends(get_db),

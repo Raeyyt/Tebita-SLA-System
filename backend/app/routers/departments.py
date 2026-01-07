@@ -10,7 +10,7 @@ from .. import schemas
 router = APIRouter(prefix="/departments", tags=["departments"])
 
 
-@router.get("/", response_model=List[schemas.DepartmentRead])
+@router.get("", response_model=List[schemas.DepartmentRead])
 async def get_departments(
     division_id: int = None,
     db: Session = Depends(get_db),
@@ -24,7 +24,7 @@ async def get_departments(
     return departments
 
 
-@router.post("/", response_model=schemas.DepartmentRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=schemas.DepartmentRead, status_code=status.HTTP_201_CREATED)
 async def create_department(
     department_in: schemas.DepartmentCreate,
     db: Session = Depends(get_db),
