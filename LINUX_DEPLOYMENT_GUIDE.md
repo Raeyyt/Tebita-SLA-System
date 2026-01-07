@@ -153,7 +153,7 @@ sudo nano /etc/nginx/sites-available/tebita
 Paste this configuration:
 ```nginx
 server {
-    listen 80;
+    listen 80; # Use 8080 if on ChromeOS/Penguin
     server_name your_domain_or_ip;
 
     # Serve Frontend
