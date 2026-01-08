@@ -12,33 +12,52 @@ from app.models import Division, Department, SubDepartment, User, DivisionType, 
 def restructure():
     db = SessionLocal()
     try:
-        print("--- Starting Robust 3-Tier Restructuring ---")
+        print("--- Starting Final 3-Tier Restructuring ---")
         
-        # 1. Ensure the 3 Main Divisions exist
+        # 1. Define the 3 Main Divisions with preferred names
         main_div_configs = {
             "EMS Division": DivisionType.INCOME_GENERATING,
-            "Medical Equipment Production and Imports": DivisionType.INCOME_GENERATING,
+            "MEDCOM Division": DivisionType.INCOME_GENERATING,
             "Support Division": DivisionType.SUPPORT
+        }
+        
+        # Mapping for renaming
+        rename_map = {
+            "Medical Equipment Production and Imports": "MEDCOM Division"
         }
         
         main_divs = {}
         for name, dtype in main_div_configs.items():
+            # Check if it exists with preferred name
             div = db.query(Division).filter(Division.name == name).first()
+            
+            # If not, check if it exists with an old name that needs renaming
+            if not div:
+                for old_name, new_name in rename_map.items():
+                    if new_name == name:
+                        old_div = db.query(Division).filter(Division.name == old_name).first()
+                        if old_div:
+                            print(f"Renaming Division: {old_name} -> {new_name}")
+                            old_div.name = new_name
+                            div = old_div
+                            break
+            
             if not div:
                 print(f"Creating Division: {name}")
                 div = Division(name=name, type=dtype, description=name)
                 db.add(div)
                 db.flush()
             else:
-                print(f"Found Division: {name} (ID: {div.id})")
-                div.type = dtype # Ensure type is correct
+                print(f"Found Division: {div.name} (ID: {div.id})")
+                div.type = dtype
+            
             main_divs[name] = div
             
         ems_div = main_divs["EMS Division"]
-        medcom_div = main_divs["Medical Equipment Production and Imports"]
+        medcom_div = main_divs["MEDCOM Division"]
         support_div = main_divs["Support Division"]
         
-        # 2. Migrate ALL other divisions to Departments under the 3 main ones
+        # 2. Migrate ALL other divisions to Departments
         all_divs = db.query(Division).all()
         for div in all_divs:
             if div.id in [ems_div.id, medcom_div.id, support_div.id]:
@@ -46,11 +65,11 @@ def restructure():
                 
             print(f"\nMigrating old Division '{div.name}' (ID: {div.id}) to Department...")
             
-            # Determine which main division it should go under
-            target_parent = support_div # Default to support
+            # Determine target parent
+            target_parent = support_div
             if "EMS" in div.name or "Ambulance" in div.name:
                 target_parent = ems_div
-            elif "Medical" in div.name or "Equipment" in div.name or "Import" in div.name:
+            elif "MEDCOM" in div.name or "Medical" in div.name or "Equipment" in div.name or "Import" in div.name:
                 target_parent = medcom_div
                 
             # Create new Department
@@ -68,18 +87,15 @@ def restructure():
                 db.add(new_dept)
                 db.flush()
             
-            # Move Users from old Division to new Department
+            # Move Users
             users_in_div = db.query(User).filter(User.division_id == div.id, User.department_id == None).all()
             for u in users_in_div:
-                print(f"  Moving User: {u.username} to {target_parent.name} / {new_dept.name}")
                 u.division_id = target_parent.id
                 u.department_id = new_dept.id
                 
-            # Move Departments from old Division to be Sub-Departments under the new Department
+            # Move Departments to Sub-Departments
             old_depts = db.query(Department).filter(Department.division_id == div.id).all()
             for old_dept in old_depts:
-                print(f"  Converting Dept '{old_dept.name}' to Sub-Department under {new_dept.name}...")
-                
                 new_sub = db.query(SubDepartment).filter(
                     SubDepartment.name == old_dept.name,
                     SubDepartment.department_id == new_dept.id
@@ -94,7 +110,6 @@ def restructure():
                     db.add(new_sub)
                     db.flush()
                 
-                # Move Users from old Dept to new Sub-Dept
                 users_in_dept = db.query(User).filter(User.department_id == old_dept.id).all()
                 for u in users_in_dept:
                     u.division_id = target_parent.id
@@ -103,26 +118,22 @@ def restructure():
                 
                 db.delete(old_dept)
                 
-            # Finally delete the old division
             db.delete(div)
             db.flush()
 
-        # 3. Fix orphaned Departments (those pointing to non-existent divisions)
-        orphaned_depts = db.query(Department).filter(Department.division_id.notin_([ems_div.id, medcom_div.id, support_div.id])).all()
+        # 3. Final Cleanup of Orphaned Records
+        valid_div_ids = [ems_div.id, medcom_div.id, support_div.id]
+        orphaned_depts = db.query(Department).filter(Department.division_id.notin_(valid_div_ids)).all()
         for dept in orphaned_depts:
-            print(f"\nFixing orphaned Department '{dept.name}' (ID: {dept.id})...")
-            # Move to Support Division by default
             dept.division_id = support_div.id
             
-        # 4. Fix orphaned Sub-Departments
         valid_dept_ids = [d.id for d in db.query(Department).all()]
         orphaned_subs = db.query(SubDepartment).filter(SubDepartment.department_id.notin_(valid_dept_ids)).all()
         for sub in orphaned_subs:
-            print(f"Deleting orphaned Sub-Department '{sub.name}'...")
             db.delete(sub)
 
         db.commit()
-        print("\n✅ Robust Restructuring Complete!")
+        print("\n✅ Final Restructuring Complete!")
         
     except Exception as e:
         print(f"❌ Error: {e}")
