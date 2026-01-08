@@ -12,128 +12,136 @@ from app.models import Division, Department, SubDepartment, User, DivisionType, 
 def restructure():
     db = SessionLocal()
     try:
-        print("--- Starting Final 3-Tier Restructuring ---")
+        print("--- Starting Exact Local Sync Restructuring ---")
         
-        # 1. Define the 3 Main Divisions with preferred names
+        # 1. Define the 3 Main Divisions as they appear locally
         main_div_configs = {
             "EMS Division": DivisionType.INCOME_GENERATING,
-            "MEDCOM Division": DivisionType.INCOME_GENERATING,
-            "Support Division": DivisionType.SUPPORT
-        }
-        
-        # Mapping for renaming
-        rename_map = {
-            "Medical Equipment Production and Imports": "MEDCOM Division"
+            "Support Division": DivisionType.SUPPORT,
+            "Medical Equipment Production and Imports": DivisionType.INCOME_GENERATING
         }
         
         main_divs = {}
         for name, dtype in main_div_configs.items():
-            # Check if it exists with preferred name
             div = db.query(Division).filter(Division.name == name).first()
-            
-            # If not, check if it exists with an old name that needs renaming
-            if not div:
-                for old_name, new_name in rename_map.items():
-                    if new_name == name:
-                        old_div = db.query(Division).filter(Division.name == old_name).first()
-                        if old_div:
-                            print(f"Renaming Division: {old_name} -> {new_name}")
-                            old_div.name = new_name
-                            div = old_div
-                            break
-            
             if not div:
                 print(f"Creating Division: {name}")
                 div = Division(name=name, type=dtype, description=name)
                 db.add(div)
                 db.flush()
             else:
-                print(f"Found Division: {div.name} (ID: {div.id})")
+                print(f"Found Division: {div.name}")
                 div.type = dtype
-            
             main_divs[name] = div
             
         ems_div = main_divs["EMS Division"]
-        medcom_div = main_divs["MEDCOM Division"]
         support_div = main_divs["Support Division"]
+        medcom_div_empty = main_divs["Medical Equipment Production and Imports"]
         
-        # 2. Migrate ALL other divisions to Departments
-        all_divs = db.query(Division).all()
-        for div in all_divs:
-            if div.id in [ems_div.id, medcom_div.id, support_div.id]:
-                continue
+        # 2. Define the exact Departments and their Sub-Departments
+        # Structure: { DivisionName: { DeptName: [SubDeptNames] } }
+        HIERARCHY = {
+            "EMS Division": {
+                "Comprehensive Ambulance Services": ["Fleet Head", "Ambulance Crew Head", "Dispatch Supervisor"],
+                "Vocational Training": ["Dean", "Vice Dean"],
+                "CPD & Short-Term Training": ["CPD Coordinator", "Short-Term Training Lead"]
+            },
+            "Support Division": {
+                "Finance Department": [
+                    "Costing Accountant", "Junior Accountant", "Cashier", 
+                    "Senior Collection & Revenue Accountant", "Store Officer", 
+                    "Senior Payment & Disbursement Accountant"
+                ],
+                "Human Resources (HR) Department": [
+                    "Office Assistance", "Legal Advisor", "Procurement", 
+                    "IT Department", "Maintenance", "Communication Officer"
+                ],
+                "MEDCOM Division": [
+                    "Medical Equipment Production Department", 
+                    "Pharmaceutical Imports Department", 
+                    "Marketing and Sales Department"
+                ]
+            }
+        }
+        
+        # 3. Apply the Hierarchy
+        for div_name, depts in HIERARCHY.items():
+            div = main_divs[div_name]
+            for dept_name, subs in depts.items():
+                # Create/Get Department
+                dept = db.query(Department).filter(Department.name == dept_name, Department.division_id == div.id).first()
+                if not dept:
+                    # Check if it exists elsewhere and move it
+                    dept = db.query(Department).filter(Department.name == dept_name).first()
+                    if dept:
+                        print(f"Moving Dept: {dept_name} to {div_name}")
+                        dept.division_id = div.id
+                    else:
+                        print(f"Creating Dept: {dept_name} under {div_name}")
+                        dept = Department(name=dept_name, division_id=div.id, description=dept_name)
+                        db.add(dept)
+                        db.flush()
                 
-            print(f"\nMigrating old Division '{div.name}' (ID: {div.id}) to Department...")
+                # Create/Get Sub-Departments
+                for sub_name in subs:
+                    sub = db.query(SubDepartment).filter(SubDepartment.name == sub_name, SubDepartment.department_id == dept.id).first()
+                    if not sub:
+                        # Check if it exists elsewhere and move it
+                        sub = db.query(SubDepartment).filter(SubDepartment.name == sub_name).first()
+                        if sub:
+                            print(f"Moving Sub: {sub_name} to {dept_name}")
+                            sub.department_id = dept.id
+                        else:
+                            print(f"Creating Sub: {sub_name} under {dept_name}")
+                            sub = SubDepartment(name=sub_name, department_id=dept.id, description=sub_name)
+                            db.add(sub)
+                            db.flush()
+                            
+        # 4. Final Cleanup: Remove any Divisions/Depts/Subs NOT in the hierarchy
+        # (Except the empty MEDCOM division we want to keep)
+        valid_div_ids = [d.id for d in main_divs.values()]
+        
+        # Get all valid dept names from HIERARCHY
+        valid_dept_names = []
+        for depts in HIERARCHY.values():
+            valid_dept_names.extend(depts.keys())
             
-            # Determine target parent
-            target_parent = support_div
-            if "EMS" in div.name or "Ambulance" in div.name:
-                target_parent = ems_div
-            elif "MEDCOM" in div.name or "Medical" in div.name or "Equipment" in div.name or "Import" in div.name:
-                target_parent = medcom_div
+        # Get all valid sub names from HIERARCHY
+        valid_sub_names = []
+        for depts in HIERARCHY.values():
+            for subs in depts.values():
+                valid_sub_names.extend(subs)
                 
-            # Create new Department
-            new_dept = db.query(Department).filter(
-                Department.name == div.name, 
-                Department.division_id == target_parent.id
-            ).first()
+        # Delete invalid Divisions
+        obsolete_divs = db.query(Division).filter(Division.id.notin_(valid_div_ids)).all()
+        for d in obsolete_divs:
+            print(f"Deleting obsolete Division: {d.name}")
+            # Move users to Support Division first
+            users = db.query(User).filter(User.division_id == d.id).all()
+            for u in users:
+                u.division_id = support_div.id
+            db.delete(d)
             
-            if not new_dept:
-                new_dept = Department(
-                    name=div.name, 
-                    division_id=target_parent.id, 
-                    description=f"Migrated from Division {div.name}"
-                )
-                db.add(new_dept)
-                db.flush()
+        # Delete invalid Departments
+        obsolete_depts = db.query(Department).filter(Department.name.notin_(valid_dept_names)).all()
+        for d in obsolete_depts:
+            print(f"Deleting obsolete Department: {d.name}")
+            users = db.query(User).filter(User.department_id == d.id).all()
+            for u in users:
+                u.department_id = None
+            db.delete(d)
             
-            # Move Users
-            users_in_div = db.query(User).filter(User.division_id == div.id, User.department_id == None).all()
-            for u in users_in_div:
-                u.division_id = target_parent.id
-                u.department_id = new_dept.id
-                
-            # Move Departments to Sub-Departments
-            old_depts = db.query(Department).filter(Department.division_id == div.id).all()
-            for old_dept in old_depts:
-                new_sub = db.query(SubDepartment).filter(
-                    SubDepartment.name == old_dept.name,
-                    SubDepartment.department_id == new_dept.id
-                ).first()
-                
-                if not new_sub:
-                    new_sub = SubDepartment(
-                        name=old_dept.name,
-                        department_id=new_dept.id,
-                        description=f"Migrated from Department {old_dept.name}"
-                    )
-                    db.add(new_sub)
-                    db.flush()
-                
-                users_in_dept = db.query(User).filter(User.department_id == old_dept.id).all()
-                for u in users_in_dept:
-                    u.division_id = target_parent.id
-                    u.department_id = new_dept.id
-                    u.subdepartment_id = new_sub.id
-                
-                db.delete(old_dept)
-                
-            db.delete(div)
-            db.flush()
-
-        # 3. Final Cleanup of Orphaned Records
-        valid_div_ids = [ems_div.id, medcom_div.id, support_div.id]
-        orphaned_depts = db.query(Department).filter(Department.division_id.notin_(valid_div_ids)).all()
-        for dept in orphaned_depts:
-            dept.division_id = support_div.id
-            
-        valid_dept_ids = [d.id for d in db.query(Department).all()]
-        orphaned_subs = db.query(SubDepartment).filter(SubDepartment.department_id.notin_(valid_dept_ids)).all()
-        for sub in orphaned_subs:
-            db.delete(sub)
+        # Delete invalid Sub-Departments
+        obsolete_subs = db.query(SubDepartment).filter(SubDepartment.name.notin_(valid_sub_names)).all()
+        for s in obsolete_subs:
+            print(f"Deleting obsolete Sub-Department: {s.name}")
+            users = db.query(User).filter(User.subdepartment_id == s.id).all()
+            for u in users:
+                u.subdepartment_id = None
+            db.delete(s)
 
         db.commit()
-        print("\n✅ Final Restructuring Complete!")
+        print("\n✅ Exact Local Sync Complete!")
         
     except Exception as e:
         print(f"❌ Error: {e}")
