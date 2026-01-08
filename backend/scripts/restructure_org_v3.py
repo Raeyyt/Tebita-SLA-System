@@ -12,62 +12,67 @@ from app.models import Division, Department, SubDepartment, User, DivisionType, 
 def restructure():
     db = SessionLocal()
     try:
-        print("--- Starting Exact Local Sync Restructuring ---")
+        print("--- Starting JSON-Based Restructuring ---")
         
-        # 1. Define the 3 Main Divisions as they appear locally
-        main_div_configs = {
-            "EMS Division": DivisionType.INCOME_GENERATING,
-            "Support Division": DivisionType.SUPPORT,
-            "Medical Equipment Production and Imports": DivisionType.INCOME_GENERATING
-        }
-        
-        main_divs = {}
-        for name, dtype in main_div_configs.items():
-            div = db.query(Division).filter(Division.name == name).first()
-            if not div:
-                print(f"Creating Division: {name}")
-                div = Division(name=name, type=dtype, description=name)
-                db.add(div)
-                db.flush()
-            else:
-                print(f"Found Division: {div.name}")
-                div.type = dtype
-            main_divs[name] = div
-            
-        ems_div = main_divs["EMS Division"]
-        support_div = main_divs["Support Division"]
-        medcom_div_empty = main_divs["Medical Equipment Production and Imports"]
-        
-        # 2. Define the exact Departments and their Sub-Departments
-        # Structure: { DivisionName: { DeptName: [SubDeptNames] } }
+        # 1. Define the Hierarchy from JSON
         HIERARCHY = {
-            "EMS Division": {
-                "Comprehensive Ambulance Services": ["Fleet Head", "Ambulance Crew Head", "Dispatch Supervisor"],
-                "Vocational Training": ["Dean", "Vice Dean"],
-                "CPD & Short-Term Training": ["CPD Coordinator", "Short-Term Training Lead"]
+            "EMS": {
+                "type": DivisionType.INCOME_GENERATING,
+                "departments": {
+                    "Comprehensive Ambulance Services": ["Fleet Head", "Ambulance Crew Head", "Dispatch Supervisor"],
+                    "Vocational Training": ["Dean", "Vice Dean"],
+                    "CPD & Short-Term Training": ["CPD Coordinator", "Short-Term Training Lead"]
+                }
             },
-            "Support Division": {
-                "Finance Department": [
-                    "Costing Accountant", "Junior Accountant", "Cashier", 
-                    "Senior Collection & Revenue Accountant", "Store Officer", 
-                    "Senior Payment & Disbursement Accountant"
-                ],
-                "Human Resources (HR) Department": [
-                    "Office Assistance", "Legal Advisor", "Procurement", 
-                    "IT Department", "Maintenance", "Communication Officer"
-                ],
-                "MEDCOM Division": [
-                    "Medical Equipment Production Department", 
-                    "Pharmaceutical Imports Department", 
-                    "Marketing and Sales Department"
-                ]
+            "Medcom": {
+                "type": DivisionType.INCOME_GENERATING,
+                "departments": {
+                    "Medical Equipment Production Department": ["Ambulance Outfitting", "First Aid Kit Production"],
+                    "Marketing and Sales Department": [],
+                    "Pharmaceutical Import Department": []
+                }
+            },
+            "Support": {
+                "type": DivisionType.SUPPORT,
+                "departments": {
+                    "Finance Department": [
+                        "Cost Accountant", "Junior Accountant", "Cashier", 
+                        "Senior Collection and Revenue Accountant", "Store Officer", 
+                        "Senior Payment & Disbursement Accountant"
+                    ],
+                    "Human Resources Department": [
+                        "Office Assistant", "Legal Advisor", "Procurement", 
+                        "IT Department", "Maintenance", "Communication Officer"
+                    ]
+                }
             }
         }
         
-        # 3. Apply the Hierarchy
-        for div_name, depts in HIERARCHY.items():
-            div = main_divs[div_name]
-            for dept_name, subs in depts.items():
+        # 2. Process Hierarchy
+        valid_div_ids = []
+        valid_dept_ids = []
+        valid_sub_ids = []
+        
+        for div_name, div_data in HIERARCHY.items():
+            # Create/Get Division
+            div = db.query(Division).filter(Division.name == div_name).first()
+            if not div:
+                # Check for similar names to rename if needed
+                similar_names = [f"{div_name} Division", div_name.upper()]
+                div = db.query(Division).filter(Division.name.in_(similar_names)).first()
+                if div:
+                    print(f"Renaming Division: {div.name} -> {div_name}")
+                    div.name = div_name
+                else:
+                    print(f"Creating Division: {div_name}")
+                    div = Division(name=div_name, type=div_data["type"], description=div_name)
+                    db.add(div)
+                    db.flush()
+            
+            div.type = div_data["type"]
+            valid_div_ids.append(div.id)
+            
+            for dept_name, subs in div_data["departments"].items():
                 # Create/Get Department
                 dept = db.query(Department).filter(Department.name == dept_name, Department.division_id == div.id).first()
                 if not dept:
@@ -82,8 +87,10 @@ def restructure():
                         db.add(dept)
                         db.flush()
                 
-                # Create/Get Sub-Departments
+                valid_dept_ids.append(dept.id)
+                
                 for sub_name in subs:
+                    # Create/Get Sub-Department
                     sub = db.query(SubDepartment).filter(SubDepartment.name == sub_name, SubDepartment.department_id == dept.id).first()
                     if not sub:
                         # Check if it exists elsewhere and move it
@@ -96,52 +103,41 @@ def restructure():
                             sub = SubDepartment(name=sub_name, department_id=dept.id, description=sub_name)
                             db.add(sub)
                             db.flush()
-                            
-        # 4. Final Cleanup: Remove any Divisions/Depts/Subs NOT in the hierarchy
-        # (Except the empty MEDCOM division we want to keep)
-        valid_div_ids = [d.id for d in main_divs.values()]
+                    
+                    valid_sub_ids.append(sub.id)
+
+        # 3. Cleanup and Re-assignment
+        # Move users from obsolete divisions to Support Division (default)
+        support_div = db.query(Division).filter(Division.name == "Support").first()
         
-        # Get all valid dept names from HIERARCHY
-        valid_dept_names = []
-        for depts in HIERARCHY.values():
-            valid_dept_names.extend(depts.keys())
-            
-        # Get all valid sub names from HIERARCHY
-        valid_sub_names = []
-        for depts in HIERARCHY.values():
-            for subs in depts.values():
-                valid_sub_names.extend(subs)
-                
-        # Delete invalid Divisions
         obsolete_divs = db.query(Division).filter(Division.id.notin_(valid_div_ids)).all()
         for d in obsolete_divs:
-            print(f"Deleting obsolete Division: {d.name}")
-            # Move users to Support Division first
+            print(f"Cleaning up obsolete Division: {d.name}")
             users = db.query(User).filter(User.division_id == d.id).all()
             for u in users:
-                u.division_id = support_div.id
+                u.division_id = support_div.id if support_div else None
             db.delete(d)
             
-        # Delete invalid Departments
-        obsolete_depts = db.query(Department).filter(Department.name.notin_(valid_dept_names)).all()
+        # Obsolete Departments
+        obsolete_depts = db.query(Department).filter(Department.id.notin_(valid_dept_ids)).all()
         for d in obsolete_depts:
-            print(f"Deleting obsolete Department: {d.name}")
+            print(f"Cleaning up obsolete Department: {d.name}")
             users = db.query(User).filter(User.department_id == d.id).all()
             for u in users:
                 u.department_id = None
             db.delete(d)
             
-        # Delete invalid Sub-Departments
-        obsolete_subs = db.query(SubDepartment).filter(SubDepartment.name.notin_(valid_sub_names)).all()
+        # Obsolete Sub-Departments
+        obsolete_subs = db.query(SubDepartment).filter(SubDepartment.id.notin_(valid_sub_ids)).all()
         for s in obsolete_subs:
-            print(f"Deleting obsolete Sub-Department: {s.name}")
+            print(f"Cleaning up obsolete Sub-Department: {s.name}")
             users = db.query(User).filter(User.subdepartment_id == s.id).all()
             for u in users:
                 u.subdepartment_id = None
             db.delete(s)
 
         db.commit()
-        print("\n✅ Exact Local Sync Complete!")
+        print("\n✅ Restructuring to JSON Hierarchy Complete!")
         
     except Exception as e:
         print(f"❌ Error: {e}")
