@@ -12,7 +12,7 @@ export const getApiUrl = () => {
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         // Only use absolute URL if we are NOT on the production port (8080)
         if (window.location.port !== '8080') {
-            return `http://${window.location.hostname}:8000`;
+            return `http://${window.location.hostname}:8000/api`;
         }
     }
 
