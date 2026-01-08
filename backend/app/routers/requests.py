@@ -48,7 +48,7 @@ def generate_request_id(db: Session, request_type: str) -> str:
     return f"{prefix}{sequence}"
 
 
-@router.get("/", response_model=List[schemas.RequestRead])
+@router.get("", response_model=List[schemas.RequestRead])
 async def get_requests(
     status: str = None,
     db: Session = Depends(get_db),
@@ -150,7 +150,7 @@ async def get_sent_requests(
     )
 
 
-@router.post("/", response_model=schemas.RequestRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=schemas.RequestRead, status_code=status.HTTP_201_CREATED)
 async def create_request(
     request_in: schemas.RequestCreate,
     db: Session = Depends(get_db),
