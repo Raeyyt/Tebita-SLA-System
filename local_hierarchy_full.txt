@@ -1,0 +1,34 @@
+Division: EMS Division
+  Department: Comprehensive Ambulance Services
+    Sub-Department: Fleet Head
+    Sub-Department: Ambulance Crew Head
+    Sub-Department: Dispatch Supervisor
+  Department: Vocational Training
+    Sub-Department: Dean
+    Sub-Department: Vice Dean
+  Department: CPD & Short-Term Training
+    Sub-Department: CPD Coordinator
+    Sub-Department: Short-Term Training Lead
+------------------------------
+Division: Support Division
+  Department: Finance Department
+    Sub-Department: Costing Accountant
+    Sub-Department: Junior Accountant
+    Sub-Department: Cashier
+    Sub-Department: Senior Collection & Revenue Accountant
+    Sub-Department: Store Officer
+    Sub-Department: Senior Payment & Disbursement Accountant
+  Department: Human Resources (HR) Department
+    Sub-Department: Office Assistance
+    Sub-Department: Legal Advisor
+    Sub-Department: Procurement
+    Sub-Department: IT Department
+    Sub-Department: Maintenance
+    Sub-Department: Communication Officer
+  Department: MEDCOM Division
+    Sub-Department: Medical Equipment Production Department
+    Sub-Department: Pharmaceutical Imports Department
+    Sub-Department: Marketing and Sales Department
+------------------------------
+Division: Medical Equipment Production and Imports
+------------------------------

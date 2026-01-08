@@ -10,7 +10,7 @@ from ..models import Request, SLAAlert, RequestStatus, User
 from .. import schemas
 from ..services.access_control import apply_role_based_filtering
 
-router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
+router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
 @router.get("/stats", response_model=schemas.DashboardStats)

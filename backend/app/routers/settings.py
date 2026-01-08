@@ -100,15 +100,20 @@ async def update_smtp_settings(
     if current_user.role != "ADMIN":
         raise HTTPException(status_code=403, detail="Admin access required")
     
+    print(f"DEBUG: update_smtp_settings called by {current_user.username} (Role: {current_user.role})")
+    print(f"DEBUG: Received config keys: {list(config.keys())}")
+    
     allowed_keys = ["smtp_email", "smtp_password", "smtp_host", "smtp_port"]
     
     for key, value in config.items():
         if key in allowed_keys:
+            print(f"DEBUG: Updating setting {key}...")
             setting = db.query(SystemSettings).filter(
                 SystemSettings.setting_key == key
             ).first()
             
             if not setting:
+                print(f"DEBUG: Creating new setting {key}")
                 setting = SystemSettings(
                     setting_key=key,
                     setting_value=value,
@@ -116,9 +121,17 @@ async def update_smtp_settings(
                 )
                 db.add(setting)
             else:
+                print(f"DEBUG: Updating existing setting {key}")
                 setting.setting_value = value
     
-    db.commit()
+    try:
+        db.commit()
+        print("DEBUG: SMTP settings committed successfully")
+    except Exception as e:
+        print(f"DEBUG: Error committing SMTP settings: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
     return {"success": True, "message": "SMTP settings updated successfully"}
 
 

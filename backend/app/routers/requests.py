@@ -205,6 +205,8 @@ async def create_request(
 
     # Generate request ID
     request_id = generate_request_id(db, request_in.request_type)
+    print(f"DEBUG: Creating request {request_id} for user {current_user.username}")
+    print(f"DEBUG: Request Data: {request_in.model_dump(exclude={'items'})}")
     
     # Create request object
     request_data = request_in.model_dump(exclude={'items'})
@@ -218,10 +220,21 @@ async def create_request(
     )
     
     # Calculate SLA deadlines using policy-based system
-    calculate_deadlines(request, db)
+    try:
+        calculate_deadlines(request, db)
+        print(f"DEBUG: SLA Deadlines calculated: Response={request.sla_response_deadline}, Completion={request.sla_completion_deadline}")
+    except Exception as e:
+        print(f"DEBUG: SLA calculation failed: {e}")
+        # We continue, but this might be a sign of issues
     
-    db.add(request)
-    db.flush()  # Get request.id without committing
+    try:
+        db.add(request)
+        db.flush()  # Get request.id without committing
+        print(f"DEBUG: Request flushed, ID: {request.id}")
+    except Exception as e:
+        print(f"DEBUG: Error adding/flushing request: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to save request: {str(e)}")
     
     # Add request items
     for item_data in request_in.items:
@@ -244,8 +257,14 @@ async def create_request(
         details=f"Request sent to division {request.assigned_division_id}"
     )
     
-    db.commit()
-    db.refresh(request)
+    try:
+        db.commit()
+        db.refresh(request)
+        print(f"DEBUG: Request {request_id} committed successfully")
+    except Exception as e:
+        print(f"DEBUG: Error committing request: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to commit request: {str(e)}")
     
     # Notify assigned user (if any) about the new request
     try:

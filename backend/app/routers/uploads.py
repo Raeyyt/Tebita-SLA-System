@@ -11,7 +11,7 @@ from ..database import get_db
 from ..auth import get_current_user
 from ..models import User
 
-router = APIRouter(prefix="/api/uploads", tags=["uploads"])
+router = APIRouter(prefix="/uploads", tags=["uploads"])
 
 # Upload configuration
 UPLOAD_DIR = Path("uploads/requests")

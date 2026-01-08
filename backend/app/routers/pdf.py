@@ -8,7 +8,7 @@ from ..auth import get_current_active_user
 from ..models import Request, User, Division, Department, UserRole
 from ..services.pdf_generator import TEditaPDFGenerator
 
-router = APIRouter(prefix="/api/requests", tags=["pdf"])
+router = APIRouter(prefix="/requests", tags=["pdf"])
 
 
 @router.get("/{request_id}/pdf")
