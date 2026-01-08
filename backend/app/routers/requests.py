@@ -157,8 +157,11 @@ async def create_request(
     current_user: User = Depends(get_current_active_user)
 ):
     """Create a new request with auto-calculated SLA deadlines"""
+    print(f"DEBUG: create_request entry - User: {current_user.username}, Role: {current_user.role}")
+    
     # 1. Restriction: Admins cannot create requests
     if current_user.role == UserRole.ADMIN:
+        print(f"DEBUG: Blocked Admin {current_user.username} from creating request")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Administrators cannot create requests. Please use a standard user account."
@@ -167,18 +170,23 @@ async def create_request(
     # 2. Restriction: Self-requests (sending to own unit)
     # Only block if sending to the EXACT SAME organizational level
     
+    print(f"DEBUG: Self-request check - Sender Div: {current_user.division_id}, Recipient Div: {request_in.assigned_division_id}")
+    
     # Check if sending to same division
     if request_in.assigned_division_id == current_user.division_id:
+        print(f"DEBUG: Same division detected. Checking departments...")
         # Check if sending to same department (both must be non-None to compare)
         if (request_in.assigned_department_id is not None and 
             current_user.department_id is not None and
             request_in.assigned_department_id == current_user.department_id):
             
+            print(f"DEBUG: Same department detected. Checking sub-departments...")
             # Check Sub-Department level (if applicable)
             # If user has subdept, and request is to same subdept -> BLOCK
             if (current_user.subdepartment_id is not None and
                 request_in.assigned_subdepartment_id is not None and
                 request_in.assigned_subdepartment_id == current_user.subdepartment_id):
+                print(f"DEBUG: Blocked self-request to Sub-Department {current_user.subdepartment_id}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="You cannot send a request to your own Sub-Department."
@@ -188,6 +196,7 @@ async def create_request(
             # (Sending to a specific subdept within own Dept is allowed for Dept Heads)
             if (current_user.subdepartment_id is None and 
                 request_in.assigned_subdepartment_id is None):
+                print(f"DEBUG: Blocked self-request to Department {current_user.department_id}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="You cannot send a request to your own Department."
@@ -198,6 +207,7 @@ async def create_request(
         elif (request_in.assigned_department_id is None and 
               current_user.department_id is None and
               current_user.role == UserRole.DIVISION_MANAGER):
+            print(f"DEBUG: Blocked self-request to Division {current_user.division_id}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="You cannot send a request to your own Division."
