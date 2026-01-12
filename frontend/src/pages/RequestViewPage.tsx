@@ -39,6 +39,11 @@ export const RequestViewPage = () => {
     const [existingRating, setExistingRating] = useState<any>(null);
     const [_ratingLoading, setRatingLoading] = useState(false);
 
+    // Rejection state
+    const [showRejectModal, setShowRejectModal] = useState(false);
+    const [rejectionReason, setRejectionReason] = useState('');
+    const [isRejecting, setIsRejecting] = useState(false);
+
     useEffect(() => {
         const fetchRequest = async () => {
             if (!token || !id) return;
@@ -265,6 +270,24 @@ export const RequestViewPage = () => {
     //         return sum + (qty * price);
     //     }, 0);
     // };
+
+    const handleRejectSubmit = async () => {
+        if (!token || !id || !rejectionReason.trim()) return;
+
+        try {
+            setIsRejecting(true);
+            const updatedRequest = await api.rejectRequest(token, parseInt(id), rejectionReason);
+            setRequest(updatedRequest);
+            setShowRejectModal(false);
+            setRejectionReason('');
+            alert('Request rejected successfully');
+        } catch (err: any) {
+            console.error('Failed to reject request', err);
+            alert(err.response?.data?.detail || 'Failed to reject request');
+        } finally {
+            setIsRejecting(false);
+        }
+    };
 
     if (loading) {
         return <div className="spinner"></div>;
@@ -1410,29 +1433,37 @@ export const RequestViewPage = () => {
                 >
                     Print
                 </button>
-
                 {/* Acknowledge Button - Only show if not acknowledged */}
-                {!request.acknowledged_at && token && (
-                    <button
-                        className="btn btn-primary"
-                        onClick={async () => {
-                            if (!window.confirm('Are you sure you want to acknowledge this request?')) return;
+                {!request.acknowledged_at && request.status !== 'REJECTED' && token && (
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                        <button
+                            className="btn btn-primary"
+                            onClick={async () => {
+                                if (!window.confirm('Are you sure you want to acknowledge this request?')) return;
 
-                            try {
-                                await api.acknowledgeRequest(token, request.id);
-                                alert('Request acknowledged successfully!');
-                                // Refresh request data
-                                const updated = await api.getRequest(token, request.id);
-                                setRequest(updated);
-                            } catch (error: any) {
-                                const message = error.response?.data?.detail || 'Failed to acknowledge request';
-                                alert(`Error: ${message}`);
-                                console.error('Error acknowledging request:', error);
-                            }
-                        }}
-                    >
-                        Acknowledge Request
-                    </button>
+                                try {
+                                    await api.acknowledgeRequest(token, request.id);
+                                    alert('Request acknowledged successfully!');
+                                    // Refresh request data
+                                    const updated = await api.getRequest(token, request.id);
+                                    setRequest(updated);
+                                } catch (error: any) {
+                                    const message = error.response?.data?.detail || 'Failed to acknowledge request';
+                                    alert(`Error: ${message}`);
+                                    console.error('Error acknowledging request:', error);
+                                }
+                            }}
+                        >
+                            Acknowledge Request
+                        </button>
+                        <button
+                            className="btn btn-outline"
+                            style={{ borderColor: '#ef4444', color: '#ef4444' }}
+                            onClick={() => setShowRejectModal(true)}
+                        >
+                            Reject Request
+                        </button>
+                    </div>
                 )}
 
                 {/* Validate Completion Button - Only show if completed but not validated */}
@@ -1554,6 +1585,43 @@ export const RequestViewPage = () => {
                         onClose={() => setShowRatingModal(false)}
                         onSubmit={handleSubmitRating}
                     />
+                )}
+
+                {/* Reject Modal */}
+                {showRejectModal && (
+                    <div className="modal-overlay" style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+                    }}>
+                        <div className="modal-content card" style={{ width: '400px', padding: '2rem', background: 'white' }}>
+                            <h3 className="text-lg font-bold mb-4">Reject Request</h3>
+                            <p className="text-sm text-muted mb-4">Please provide a reason for rejecting this request.</p>
+                            <textarea
+                                className="form-input w-full mb-4"
+                                rows={4}
+                                placeholder="Enter rejection reason..."
+                                value={rejectionReason}
+                                onChange={(e) => setRejectionReason(e.target.value)}
+                                style={{ width: '100%', marginBottom: '1rem', padding: '0.5rem', border: '1px solid #ced4da', borderRadius: '4px' }}
+                            />
+                            <div className="flex justify-end gap-2" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                                <button
+                                    className="btn btn-outline"
+                                    onClick={() => setShowRejectModal(false)}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    className="btn btn-danger"
+                                    style={{ backgroundColor: '#ef4444', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}
+                                    onClick={handleRejectSubmit}
+                                    disabled={!rejectionReason.trim() || isRejecting}
+                                >
+                                    {isRejecting ? 'Rejecting...' : 'Reject Request'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
         </div>
