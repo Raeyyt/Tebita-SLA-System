@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import func, case, extract
+from sqlalchemy import func, case, extract, or_, and_, String
 from app.models import (
     Request, RequestStatus, Priority, ResourceType, ActivityType,
     FleetRequest, HRDeployment, FinanceTransaction, ICTTicket, LogisticsRequest, 
@@ -11,15 +11,30 @@ from typing import List, Dict, Optional, Tuple
 def calculate_kpi_metrics(db: Session, department_id: int = None, division_id: int = None):
     """
     Calculates real-time KPI metrics for a given department/division (or all if None).
+    Uses SQL aggregations for performance.
     """
-    query = db.query(Request)
+    now = datetime.utcnow()
+    
+    # Base filters
+    filters = []
     if department_id:
-        query = query.filter(Request.assigned_department_id == department_id)
+        filters.append(Request.assigned_department_id == department_id)
     if division_id:
-        query = query.filter(Request.assigned_division_id == division_id)
+        filters.append(Request.assigned_division_id == division_id)
         
-    # Base stats
-    total_requests = query.count()
+    # 1. Base Stats and Priority Breakdown in one query
+    stats_query = db.query(
+        func.count(Request.id).label("total"),
+        func.count(case((Request.priority == Priority.HIGH, 1))).label("high"),
+        func.count(case((Request.priority == Priority.MEDIUM, 1))).label("medium"),
+        func.count(case((Request.priority == Priority.LOW, 1))).label("low"),
+        func.count(case((Request.status == RequestStatus.REJECTED, 1))).label("rejected"),
+        func.count(case((Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVAL_PENDING]), 1))).label("pending")
+    ).filter(*filters)
+    
+    stats = stats_query.one()
+    total_requests = stats.total
+    
     if total_requests == 0:
         return {
             "total_requests": 0,
@@ -27,88 +42,56 @@ def calculate_kpi_metrics(db: Session, department_id: int = None, division_id: i
             "avg_resolution_time_hours": 0,
             "pending_requests": 0,
             "rejection_rate": 0,
-            "priority_breakdown": {
-                "high": 0,
-                "medium": 0,
-                "low": 0
-            }
+            "priority_breakdown": {"high": 0, "medium": 0, "low": 0}
         }
 
-    # 1. SLA Resolution Compliance (includes active overdue requests)
-    now = datetime.utcnow()
+    # 2. SLA Compliance Rate (SQL-based)
+    # Compliant if actual_completion_time <= created_at + sla_completion_time_hours
+    # Non-compliant if actual_completion_time > deadline OR (active AND now > deadline)
     
-    # Get all completed requests with SLA time defined
-    completed_requests = query.filter(
+    # We use a subquery or complex case to handle the interval arithmetic safely across DB types
+    # For simplicity and cross-DB compatibility, we'll use two counts
+    
+    # Count compliant completed
+    compliant_completed = db.query(func.count(Request.id)).filter(
+        *filters,
         Request.status == RequestStatus.COMPLETED,
+        extract('epoch', Request.actual_completion_time) <= extract('epoch', Request.created_at) + (Request.sla_completion_time_hours * 3600)
+    ).scalar() or 0
+    
+    # Count total that should have been completed (Completed + Active Overdue)
+    total_to_evaluate = db.query(func.count(Request.id)).filter(
+        *filters,
         Request.sla_completion_time_hours.isnot(None),
-        Request.created_at.isnot(None),
-        Request.actual_completion_time.isnot(None)
-    ).all()
+        or_(
+            Request.status == RequestStatus.COMPLETED,
+            and_(
+                Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
+                extract('epoch', func.now()) > extract('epoch', Request.created_at) + (Request.sla_completion_time_hours * 3600)
+            )
+        )
+    ).scalar() or 0
     
-    compliant_completed = 0
-    non_compliant_completed = 0
-    
-    for req in completed_requests:
-        deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
-        if req.actual_completion_time <= deadline:
-            compliant_completed += 1
-        else:
-            non_compliant_completed += 1
-    
-    # Get active overdue requests
-    active_requests = query.filter(
-        Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
-        Request.sla_completion_time_hours.isnot(None),
-        Request.created_at.isnot(None)
-    ).all()
-    
-    overdue_active = 0
-    for req in active_requests:
-        deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
-        if now > deadline:
-            overdue_active += 1
-    
-    # Total requests to evaluate
-    total_evaluated = compliant_completed + non_compliant_completed + overdue_active
-    compliance_rate = (compliant_completed / total_evaluated * 100) if total_evaluated > 0 else 100
+    compliance_rate = (compliant_completed / total_to_evaluate * 100) if total_to_evaluate > 0 else 100
 
-    # 2. Average Resolution Time
+    # 3. Average Resolution Time (SQL-based)
     avg_time_query = db.query(
         func.avg(extract('epoch', Request.actual_completion_time) - extract('epoch', Request.created_at))
-    ).filter(Request.status == RequestStatus.COMPLETED)
+    ).filter(*filters, Request.status == RequestStatus.COMPLETED)
     
-    if department_id:
-        avg_time_query = avg_time_query.filter(Request.assigned_department_id == department_id)
-    if division_id:
-        avg_time_query = avg_time_query.filter(Request.assigned_division_id == division_id)
-        
     avg_seconds = avg_time_query.scalar() or 0
     avg_hours = round(avg_seconds / 3600, 1)
-
-    # 3. Pending Requests
-    pending_count = query.filter(
-        Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVAL_PENDING])
-    ).count()
-
-    # 4. Priority Distribution
-    high_priority = query.filter(Request.priority == Priority.HIGH).count()
-    medium_priority = query.filter(Request.priority == Priority.MEDIUM).count()
-    low_priority = query.filter(Request.priority == Priority.LOW).count()
-
-    # 5. Rejection Rate
-    rejected_count = query.filter(Request.status == RequestStatus.REJECTED).count()
-    rejection_rate = (rejected_count / total_requests * 100) if total_requests > 0 else 0
 
     return {
         "total_requests": total_requests,
         "sla_compliance_rate": round(compliance_rate, 1),
         "avg_resolution_time_hours": avg_hours,
-        "pending_requests": pending_count,
-        "rejection_rate": round(rejection_rate, 1),
+        "pending_requests": stats.pending,
+        "rejection_rate": round((stats.rejected / total_requests * 100), 1),
         "priority_breakdown": {
-            "high": high_priority,
-            "medium": medium_priority,
-            "low": low_priority
+            "high": stats.high,
+            "medium": stats.medium,
+            "low": stats.low
         }
     }
 
@@ -117,29 +100,36 @@ def calculate_kpi_metrics(db: Session, department_id: int = None, division_id: i
 # ============================================================================
 
 def calculate_sla_compliance_rate(db: Session, division_id: int = None, department_id: int = None, start_date: datetime = None, end_date: datetime = None):
+    """Calculates SLA compliance rate using SQL aggregations"""
     query = db.query(Request).filter(Request.status == RequestStatus.COMPLETED)
     if start_date: query = query.filter(Request.created_at >= start_date)
     if end_date: query = query.filter(Request.created_at <= end_date)
     if division_id: query = query.filter(Request.assigned_division_id == division_id)
     if department_id: query = query.filter(Request.assigned_department_id == department_id)
     
-    total = query.count()
-    if total == 0: return 100.0
+    # Use SQL to compare times
+    stats = db.query(
+        func.count(Request.id).label("total"),
+        func.count(case((Request.actual_completion_time <= Request.sla_completion_deadline, 1))).label("compliant")
+    ).filter(query.whereclause).one()
     
-    compliant = query.filter(Request.actual_completion_time <= Request.sla_completion_deadline).count()
-    return (compliant / total) * 100.0
+    if stats.total == 0: return 100.0
+    return (stats.compliant / stats.total) * 100.0
 
 def calculate_service_request_fulfillment_rate(db: Session, division_id: int = None, start_date: datetime = None, end_date: datetime = None):
+    """Calculates fulfillment rate using SQL aggregations"""
     query = db.query(Request)
     if start_date: query = query.filter(Request.created_at >= start_date)
     if end_date: query = query.filter(Request.created_at <= end_date)
     if division_id: query = query.filter(Request.assigned_division_id == division_id)
     
-    total = query.count()
-    if total == 0: return 100.0
+    stats = db.query(
+        func.count(Request.id).label("total"),
+        func.count(case((Request.status == RequestStatus.COMPLETED, 1))).label("fulfilled")
+    ).filter(query.whereclause).one()
     
-    fulfilled = query.filter(Request.status == RequestStatus.COMPLETED).count()
-    return (fulfilled / total) * 100.0
+    if stats.total == 0: return 100.0
+    return (stats.fulfilled / stats.total) * 100.0
 
 def calculate_customer_satisfaction_score(db: Session, division_id: int = None, start_date: datetime = None, end_date: datetime = None):
     query = db.query(func.avg(CustomerSatisfaction.overall_score)).join(Request)
@@ -387,28 +377,21 @@ def calculate_completed_in_period(db: Session, start_date: datetime = None, end_
 
 def calculate_overdue_requests(db: Session, department_id: int = None, division_id: int = None):
     """
-    Calculates count of requests that are currently overdue.
-    Includes active overdue requests (PENDING or IN_PROGRESS past their deadline).
+    Calculates count of requests that are currently overdue using SQL.
+    Includes active requests (PENDING or IN_PROGRESS past their deadline).
     """
-    query = db.query(Request)
+    now = datetime.utcnow()
+    
+    query = db.query(func.count(Request.id)).filter(
+        Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
+        Request.sla_completion_time_hours.isnot(None),
+        Request.created_at.isnot(None),
+        extract('epoch', func.now()) > extract('epoch', Request.created_at) + (Request.sla_completion_time_hours * 3600)
+    )
+    
     if department_id:
         query = query.filter(Request.assigned_department_id == department_id)
     if division_id:
         query = query.filter(Request.assigned_division_id == division_id)
     
-    now = datetime.utcnow()
-    
-    # Get active requests with SLA time defined
-    active_requests = query.filter(
-        Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
-        Request.sla_completion_time_hours.isnot(None),
-        Request.created_at.isnot(None)
-    ).all()
-    
-    overdue_count = 0
-    for req in active_requests:
-        deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
-        if now > deadline:
-            overdue_count += 1
-    
-    return overdue_count
+    return query.scalar() or 0

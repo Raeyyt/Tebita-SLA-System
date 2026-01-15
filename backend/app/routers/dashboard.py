@@ -18,63 +18,49 @@ def get_dashboard_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get dashboard statistics"""
+    """Get dashboard statistics using optimized SQL aggregations"""
+    from sqlalchemy import and_, or_, case, String
     
     # Base query with role-based filtering
     base_query = db.query(Request)
     base_query = apply_role_based_filtering(base_query, current_user)
     
-    # Total requests
-    total_requests = base_query.count()
+    # 1. Get counts in one query
+    stats = db.query(
+        func.count(Request.id).label("total"),
+        func.count(case((Request.status == RequestStatus.APPROVAL_PENDING, 1))).label("pending_approval"),
+        func.count(case((Request.status == RequestStatus.IN_PROGRESS, 1))).label("in_progress"),
+        func.count(case((Request.status == RequestStatus.COMPLETED, 1))).label("completed")
+    ).filter(base_query.whereclause).one()
     
-    # Pending approval
-    pending_approval = base_query.filter(
-        Request.status == RequestStatus.APPROVAL_PENDING
-    ).count()
+    # 2. Overdue requests (SQL-based)
+    overdue = db.query(func.count(Request.id)).filter(
+        base_query.whereclause,
+        Request.status.in_([RequestStatus.PENDING, RequestStatus.APPROVAL_PENDING, RequestStatus.IN_PROGRESS]),
+        Request.sla_response_time_hours.isnot(None),
+        extract('epoch', func.now()) > extract('epoch', Request.created_at) + (Request.sla_response_time_hours * 3600)
+    ).scalar() or 0
     
-    # In progress
-    in_progress = base_query.filter(
-        Request.status == RequestStatus.IN_PROGRESS
-    ).count()
-    
-    # Completed
-    completed = base_query.filter(
-        Request.status == RequestStatus.COMPLETED
-    ).count()
-    
-    # Overdue requests (created more than SLA hours ago and not completed)
-    now = datetime.now()
-    overdue = 0
-    active_requests = base_query.filter(
-        Request.status.in_([RequestStatus.PENDING, RequestStatus.APPROVAL_PENDING, RequestStatus.IN_PROGRESS])
-    ).all()
-    
-    for req in active_requests:
-        if not req.created_at or not req.sla_response_time_hours:
-            continue
-        hours_elapsed = (now - req.created_at).total_seconds() / 3600
-        if hours_elapsed > req.sla_response_time_hours:
-            overdue += 1
-    
-    # SLA compliance (percentage of requests completed within SLA)
-    completed_requests = base_query.filter(
+    # 3. SLA compliance (SQL-based)
+    compliance_stats = db.query(
+        func.count(Request.id).label("total_completed"),
+        func.count(case((
+            and_(
+                Request.completed_at.isnot(None),
+                Request.created_at.isnot(None),
+                Request.sla_completion_time_hours.isnot(None),
+                (extract('epoch', Request.completed_at) - extract('epoch', Request.created_at)) / 3600 <= Request.sla_completion_time_hours
+            ), 1
+        ))).label("compliant")
+    ).filter(
+        base_query.whereclause,
         Request.status == RequestStatus.COMPLETED,
-        Request.completed_at.isnot(None)
-    ).all()
+        Request.sla_completion_time_hours.isnot(None)
+    ).one()
     
-    compliant = 0
-    total_with_sla = 0
-    for req in completed_requests:
-        if not req.created_at or not req.completed_at or not req.sla_completion_time_hours:
-            continue
-        total_with_sla += 1
-        hours_taken = (req.completed_at - req.created_at).total_seconds() / 3600
-        if hours_taken <= req.sla_completion_time_hours:
-            compliant += 1
+    sla_compliance = round((compliance_stats.compliant / compliance_stats.total_completed * 100) if compliance_stats.total_completed else 0, 1)
     
-    sla_compliance = round((compliant / total_with_sla * 100) if total_with_sla else 0, 1)
-    
-    # SLA alerts count
+    # 4. SLA alerts count
     active_alerts_query = db.query(SLAAlert).join(Request).filter(
         SLAAlert.acknowledged_at.is_(None)
     )
@@ -82,10 +68,10 @@ def get_dashboard_stats(
     active_alerts = active_alerts_query.count()
     
     return {
-        "total_requests": total_requests,
-        "pending_approval": pending_approval,
-        "in_progress": in_progress,
-        "completed": completed,
+        "total_requests": stats.total,
+        "pending_approval": stats.pending_approval,
+        "in_progress": stats.in_progress,
+        "completed": stats.completed,
         "overdue": overdue,
         "sla_compliance": sla_compliance,
         "active_alerts": active_alerts
