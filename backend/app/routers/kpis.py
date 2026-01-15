@@ -241,7 +241,7 @@ async def get_kpi_dashboard(
     actual_resp = func.coalesce(Request.actual_response_time, Request.acknowledged_at)
     actual_comp = func.coalesce(Request.actual_completion_time, Request.completed_at)
     
-    sla_stats = db.query(
+    sla_stats = base_query.with_entities(
         func.count(case((
             and_(
                 actual_resp.isnot(None),
@@ -270,7 +270,7 @@ async def get_kpi_dashboard(
                 extract('epoch', actual_comp) - created_epoch
             ))
         ).label("avg_completion_seconds")
-    ).filter(base_query.whereclause).one()
+    ).one()
     
     sla_rate = (sla_stats.compliant / sla_stats.evaluated * 100) if sla_stats.evaluated > 0 else 100
     avg_completion = (sla_stats.avg_completion_seconds / 3600) if sla_stats.avg_completion_seconds else 0

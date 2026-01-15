@@ -108,10 +108,10 @@ def calculate_sla_compliance_rate(db: Session, division_id: int = None, departme
     if department_id: query = query.filter(Request.assigned_department_id == department_id)
     
     # Use SQL to compare times
-    stats = db.query(
+    stats = query.with_entities(
         func.count(Request.id).label("total"),
         func.count(case((Request.actual_completion_time <= Request.sla_completion_deadline, 1))).label("compliant")
-    ).filter(query.whereclause).one()
+    ).one()
     
     if stats.total == 0: return 100.0
     return (stats.compliant / stats.total) * 100.0
@@ -123,10 +123,10 @@ def calculate_service_request_fulfillment_rate(db: Session, division_id: int = N
     if end_date: query = query.filter(Request.created_at <= end_date)
     if division_id: query = query.filter(Request.assigned_division_id == division_id)
     
-    stats = db.query(
+    stats = query.with_entities(
         func.count(Request.id).label("total"),
         func.count(case((Request.status == RequestStatus.COMPLETED, 1))).label("fulfilled")
-    ).filter(query.whereclause).one()
+    ).one()
     
     if stats.total == 0: return 100.0
     return (stats.fulfilled / stats.total) * 100.0

@@ -26,20 +26,19 @@ def get_dashboard_stats(
     base_query = apply_role_based_filtering(base_query, current_user)
     
     # 1. Get counts in one query
-    stats = db.query(
+    stats = base_query.with_entities(
         func.count(Request.id).label("total"),
         func.count(case((Request.status == RequestStatus.APPROVAL_PENDING, 1))).label("pending_approval"),
         func.count(case((Request.status == RequestStatus.IN_PROGRESS, 1))).label("in_progress"),
         func.count(case((Request.status == RequestStatus.COMPLETED, 1))).label("completed")
-    ).filter(base_query.whereclause).one()
+    ).one()
     
     # 2. Overdue requests (SQL-based)
-    overdue = db.query(func.count(Request.id)).filter(
-        base_query.whereclause,
+    overdue = base_query.filter(
         Request.status.in_([RequestStatus.PENDING, RequestStatus.APPROVAL_PENDING, RequestStatus.IN_PROGRESS]),
         Request.sla_response_time_hours.isnot(None),
         extract('epoch', func.now()) > extract('epoch', Request.created_at) + (Request.sla_response_time_hours * 3600)
-    ).scalar() or 0
+    ).with_entities(func.count(Request.id)).scalar() or 0
     
     # 3. SLA compliance (SQL-based)
     # A request is compliant ONLY if both response and resolution SLAs are met
@@ -47,7 +46,9 @@ def get_dashboard_stats(
     actual_resp = func.coalesce(Request.actual_response_time, Request.acknowledged_at)
     actual_comp = func.coalesce(Request.actual_completion_time, Request.completed_at)
     
-    compliance_stats = db.query(
+    compliance_stats = base_query.filter(
+        Request.status == RequestStatus.COMPLETED
+    ).with_entities(
         func.count(Request.id).label("total_completed"),
         func.count(case((
             and_(
@@ -61,9 +62,6 @@ def get_dashboard_stats(
                 extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
             ), 1
         ))).label("compliant")
-    ).filter(
-        base_query.whereclause,
-        Request.status == RequestStatus.COMPLETED
     ).one()
     
     sla_compliance = round((compliance_stats.compliant / compliance_stats.total_completed * 100) if compliance_stats.total_completed else 0, 1)

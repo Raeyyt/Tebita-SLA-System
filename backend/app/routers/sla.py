@@ -41,7 +41,9 @@ async def get_sla_compliance(
     actual_resp = func.coalesce(Request.actual_response_time, Request.acknowledged_at)
     actual_comp = func.coalesce(Request.actual_completion_time, Request.completed_at)
     
-    completed_stats = db.query(
+    completed_stats = base_query.filter(
+        Request.status == RequestStatus.COMPLETED
+    ).with_entities(
         func.count(Request.id).label("total"),
         func.count(case((
             and_(
@@ -58,14 +60,10 @@ async def get_sla_compliance(
         func.avg(
             extract('epoch', actual_comp) - extract('epoch', Request.created_at)
         ).label("avg_time_seconds")
-    ).filter(
-        base_query.whereclause,
-        Request.status == RequestStatus.COMPLETED
     ).one()
     
     # 2. Get active overdue requests (either response or resolution overdue)
-    overdue_active = db.query(func.count(Request.id)).filter(
-        base_query.whereclause,
+    overdue_active = base_query.filter(
         Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
         or_(
             # Response overdue (if not yet acknowledged)
@@ -76,10 +74,10 @@ async def get_sla_compliance(
             # Resolution overdue
             extract('epoch', func.now()) > extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
         )
-    ).scalar() or 0
+    ).with_entities(func.count(Request.id)).scalar() or 0
     
     # Total calculations
-    total_requests = db.query(func.count(Request.id)).filter(base_query.whereclause).scalar() or 0
+    total_requests = base_query.with_entities(func.count(Request.id)).scalar() or 0
     within_sla = completed_stats.within_sla or 0
     overdue_completed = (completed_stats.total or 0) - within_sla
     
@@ -129,8 +127,7 @@ async def get_overdue_requests(
     base_query = apply_role_based_filtering(base_query, current_user)
     
     # Get overdue requests directly in SQL
-    overdue_requests = db.query(Request).filter(
-        base_query.whereclause,
+    overdue_requests = base_query.filter(
         or_(
             # Response overdue (if not yet acknowledged)
             and_(
@@ -186,21 +183,22 @@ async def get_sla_dashboard(
     # Composite percent (the worse of the two)
     percent_consumed = func.greatest(resp_percent, res_percent)
     
-    stats = db.query(
+    stats = base_query.with_entities(
         func.count(Request.id).label("total_active"),
         func.count(case((percent_consumed >= 100, 1))).label("overdue"),
         func.count(case((and_(percent_consumed >= 80, percent_consumed < 100), 1))).label("critical"),
         func.count(case((and_(percent_consumed >= 50, percent_consumed < 80), 1))).label("at_risk"),
         func.count(case((percent_consumed < 50, 1))).label("on_track")
-    ).filter(base_query.whereclause).one()
+    ).one()
     
     # Today's compliance
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    today_completed = db.query(func.count(Request.id)).filter(
-        apply_role_based_filtering(db.query(Request), current_user).whereclause,
+    today_completed_query = db.query(Request).filter(
         Request.status == RequestStatus.COMPLETED,
         Request.completed_at >= today_start
-    ).scalar() or 0
+    )
+    today_completed_query = apply_role_based_filtering(today_completed_query, current_user)
+    today_completed = today_completed_query.with_entities(func.count(Request.id)).scalar() or 0
     
     return {
         "active_requests": stats.total_active or 0,

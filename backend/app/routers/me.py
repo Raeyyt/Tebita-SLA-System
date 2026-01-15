@@ -49,7 +49,7 @@ async def get_me_dashboard(
         actual_resp = func.coalesce(Request.actual_response_time, Request.acknowledged_at)
         actual_comp = func.coalesce(Request.actual_completion_time, Request.completed_at)
         
-        sla_stats = db.query(
+        sla_stats = base_query.with_entities(
             func.count(case((
                 and_(
                     actual_resp.isnot(None),
@@ -86,7 +86,7 @@ async def get_me_dashboard(
                     )
                 ), 1
             ))).label("overdue_active")
-        ).filter(base_query.whereclause).one()
+        ).one()
         
         sla_compliance = (sla_stats.compliant / sla_stats.evaluated * 100) if sla_stats.evaluated > 0 else 100
         
