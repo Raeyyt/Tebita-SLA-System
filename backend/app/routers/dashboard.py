@@ -35,7 +35,7 @@ def get_dashboard_stats(
     
     # 2. Overdue requests (SQL-based) - Align with sla.py logic
     overdue = base_query.filter(
-        Request.status.in_([RequestStatus.PENDING, RequestStatus.APPROVAL_PENDING, RequestStatus.IN_PROGRESS]),
+        Request.status.in_([RequestStatus.PENDING, RequestStatus.APPROVAL_PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVED]),
         or_(
             # Response overdue
             and_(

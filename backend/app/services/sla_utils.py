@@ -249,7 +249,7 @@ def calculate_sla_compliance_rate(
     total_evaluated = sum(
         1 for r in requests
         if r.status == RequestStatus.COMPLETED or (
-            r.status in [RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVAL_PENDING] and
+            r.status in [RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVAL_PENDING, RequestStatus.APPROVED] and
             r.sla_completion_deadline and now > r.sla_completion_deadline
         )
     )

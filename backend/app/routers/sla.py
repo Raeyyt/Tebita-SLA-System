@@ -64,7 +64,7 @@ async def get_sla_compliance(
     
     # 2. Get active overdue requests (either response or resolution overdue)
     overdue_active = base_query.filter(
-        Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
+        Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVAL_PENDING, RequestStatus.APPROVED]),
         or_(
             # Response overdue (if not yet acknowledged)
             and_(

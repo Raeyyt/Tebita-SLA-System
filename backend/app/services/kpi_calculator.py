@@ -62,12 +62,11 @@ def calculate_kpi_metrics(db: Session, department_id: int = None, division_id: i
     # Count total that should have been completed (Completed + Active Overdue)
     total_to_evaluate = db.query(func.count(Request.id)).filter(
         *filters,
-        Request.sla_completion_time_hours.isnot(None),
         or_(
             Request.status == RequestStatus.COMPLETED,
             and_(
-                Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
-                extract('epoch', func.now()) > extract('epoch', Request.created_at) + (Request.sla_completion_time_hours * 3600)
+                Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVAL_PENDING, RequestStatus.APPROVED]),
+                extract('epoch', func.now()) > extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
             )
         )
     ).scalar() or 0
@@ -112,7 +111,7 @@ def calculate_sla_compliance_rate(db: Session, division_id: int = None, departme
         or_(
             Request.status == RequestStatus.COMPLETED,
             and_(
-                Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVAL_PENDING]),
+                Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVAL_PENDING, RequestStatus.APPROVED]),
                 extract('epoch', func.now()) > extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
             )
         )

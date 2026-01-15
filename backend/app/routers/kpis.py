@@ -261,7 +261,10 @@ async def get_kpi_dashboard(
                     now_epoch > created_epoch + resp_target
                 ),
                 # Resolution overdue
-                now_epoch > created_epoch + res_target
+                and_(
+                    Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVAL_PENDING, RequestStatus.APPROVED]),
+                    now_epoch > created_epoch + res_target
+                )
             ), 1
         ))).label("evaluated"),
         func.avg(
@@ -376,7 +379,7 @@ def calculate_scorecard(db: Session, start: datetime, end: datetime, division_id
     active_overdue = 0
     now = datetime.utcnow()
     for req in requests:
-        if req.status in [RequestStatus.PENDING, RequestStatus.IN_PROGRESS]:
+        if req.status in [RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVAL_PENDING, RequestStatus.APPROVED]:
             # Response overdue?
             if not req.acknowledged_at:
                 resp_deadline = req.created_at + timedelta(hours=req.sla_response_time_hours or 2)

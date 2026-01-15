@@ -54,7 +54,7 @@ def calculate_service_efficiency_score(
             Request.actual_response_time.isnot(None),
             and_(
                 Request.acknowledged_at.is_(None),
-                Request.status.in_([RequestStatus.PENDING, RequestStatus.APPROVAL_PENDING]),
+                Request.status.in_([RequestStatus.PENDING, RequestStatus.APPROVAL_PENDING, RequestStatus.APPROVED]),
                 extract('epoch', func.now()) > extract('epoch', Request.created_at) + (func.coalesce(Request.sla_response_time_hours, 2) * 3600)
             )
         )

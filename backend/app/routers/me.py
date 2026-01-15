@@ -69,7 +69,10 @@ async def get_me_dashboard(
                         now_epoch > created_epoch + resp_target
                     ),
                     # Resolution overdue
-                    now_epoch > created_epoch + res_target
+                    and_(
+                        Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVAL_PENDING, RequestStatus.APPROVED]),
+                        now_epoch > created_epoch + res_target
+                    )
                 ), 1
             ))).label("evaluated"),
             func.count(case((
@@ -81,7 +84,7 @@ async def get_me_dashboard(
                     ),
                     # Resolution overdue (active only)
                     and_(
-                        Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
+                        Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVAL_PENDING, RequestStatus.APPROVED]),
                         now_epoch > created_epoch + res_target
                     )
                 ), 1
