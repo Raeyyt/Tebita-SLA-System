@@ -227,7 +227,7 @@ def calculate_sla_compliance_rate(
     date_range: Tuple[datetime, datetime] = None
 ) -> float:
     """
-    Calculate SLA compliance rate for a set of requests.
+    Calculate SLA compliance rate for a set of requests, including active overdue ones.
     
     Args:
         requests: List of Request objects
@@ -237,20 +237,27 @@ def calculate_sla_compliance_rate(
     Returns:
         Compliance rate as percentage (0-100)
     """
-    completed_requests = [
-        r for r in requests 
-        if r.status == RequestStatus.COMPLETED
-    ]
+    now = datetime.utcnow()
     
-    if not completed_requests:
-        return 0.0
-    
+    # 1. Count compliant completed
     on_time_count = sum(
-        1 for r in completed_requests 
-        if check_sla_compliance(r)['sla_met']
+        1 for r in requests 
+        if r.status == RequestStatus.COMPLETED and check_sla_compliance(r)['sla_met']
     )
     
-    return (on_time_count / len(completed_requests)) * 100
+    # 2. Count total evaluated (Completed + Active Overdue)
+    total_evaluated = sum(
+        1 for r in requests
+        if r.status == RequestStatus.COMPLETED or (
+            r.status in [RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVAL_PENDING] and
+            r.sla_completion_deadline and now > r.sla_completion_deadline
+        )
+    )
+    
+    if total_evaluated == 0:
+        return 100.0
+    
+    return (on_time_count / total_evaluated) * 100
 
 
 def get_delay_reason_template(resource_type: ResourceType) -> str:

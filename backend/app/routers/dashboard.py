@@ -19,7 +19,7 @@ def get_dashboard_stats(
     current_user: User = Depends(get_current_active_user)
 ):
     """Get dashboard statistics using optimized SQL aggregations"""
-    from sqlalchemy import and_, or_, case, String
+    from sqlalchemy import and_, or_, case, String, extract
     
     # Base query with role-based filtering
     base_query = db.query(Request)
@@ -33,38 +33,49 @@ def get_dashboard_stats(
         func.count(case((Request.status == RequestStatus.COMPLETED, 1))).label("completed")
     ).one()
     
-    # 2. Overdue requests (SQL-based)
+    # 2. Overdue requests (SQL-based) - Align with sla.py logic
     overdue = base_query.filter(
         Request.status.in_([RequestStatus.PENDING, RequestStatus.APPROVAL_PENDING, RequestStatus.IN_PROGRESS]),
-        Request.sla_response_time_hours.isnot(None),
-        extract('epoch', func.now()) > extract('epoch', Request.created_at) + (Request.sla_response_time_hours * 3600)
+        or_(
+            # Response overdue
+            and_(
+                Request.acknowledged_at.is_(None),
+                extract('epoch', func.now()) > extract('epoch', Request.created_at) + (func.coalesce(Request.sla_response_time_hours, 2) * 3600)
+            ),
+            # Resolution overdue
+            extract('epoch', func.now()) > extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
+        )
     ).with_entities(func.count(Request.id)).scalar() or 0
     
     # 3. SLA compliance (SQL-based)
     # A request is compliant ONLY if both response and resolution SLAs are met
-    # We use COALESCE to support older requests that only have acknowledged_at/completed_at
+    # We include active overdue requests in the denominator for a real-time view
     actual_resp = func.coalesce(Request.actual_response_time, Request.acknowledged_at)
     actual_comp = func.coalesce(Request.actual_completion_time, Request.completed_at)
     
-    compliance_stats = base_query.filter(
-        Request.status == RequestStatus.COMPLETED
-    ).with_entities(
-        func.count(Request.id).label("total_completed"),
-        func.count(case((
-            and_(
-                actual_resp.isnot(None),
-                actual_comp.isnot(None),
-                # Response SLA met
-                extract('epoch', actual_resp) <= 
-                extract('epoch', Request.created_at) + (func.coalesce(Request.sla_response_time_hours, 2) * 3600),
-                # Resolution SLA met
-                extract('epoch', actual_comp) <= 
-                extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
-            ), 1
-        ))).label("compliant")
-    ).one()
+    total_completed = stats.completed or 0
+    total_evaluated = total_completed + overdue
     
-    sla_compliance = round((compliance_stats.compliant / compliance_stats.total_completed * 100) if compliance_stats.total_completed else 0, 1)
+    if total_evaluated == 0:
+        sla_compliance = 100.0
+    else:
+        compliant_count = base_query.filter(
+            Request.status == RequestStatus.COMPLETED
+        ).with_entities(
+            func.count(case((
+                and_(
+                    actual_resp.isnot(None),
+                    actual_comp.isnot(None),
+                    # Response SLA met
+                    extract('epoch', actual_resp) <= 
+                    extract('epoch', Request.created_at) + (func.coalesce(Request.sla_response_time_hours, 2) * 3600),
+                    # Resolution SLA met
+                    extract('epoch', actual_comp) <= 
+                    extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
+                ), 1
+            )))
+        ).scalar() or 0
+        sla_compliance = round((compliant_count / total_evaluated * 100), 1)
     
     # 4. SLA alerts count
     active_alerts_query = db.query(SLAAlert).join(Request).filter(

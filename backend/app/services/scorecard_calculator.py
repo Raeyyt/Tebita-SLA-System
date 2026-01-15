@@ -38,29 +38,42 @@ def calculate_service_efficiency_score(
     - SLA Completion Time (10%)
     - Resource Utilization Efficiency (5%)
     """
-    # Calculate average response time compliance
-    query = db.query(Request).filter(
+    # Calculate response time score (10%)
+    # Include both completed (on-time) and active (overdue)
+    from sqlalchemy import extract, and_, or_
+    
+    # 1. Count compliant responses (completed on time)
+    compliant_responses = db.query(func.count(Request.id)).filter(
         Request.actual_response_time.isnot(None),
-        Request.sla_response_deadline.isnot(None)
+        Request.actual_response_time <= Request.sla_response_deadline
+    )
+    
+    # 2. Count total evaluated for response (Completed + Active Overdue)
+    total_evaluated_query = db.query(func.count(Request.id)).filter(
+        or_(
+            Request.actual_response_time.isnot(None),
+            and_(
+                Request.acknowledged_at.is_(None),
+                Request.status.in_([RequestStatus.PENDING, RequestStatus.APPROVAL_PENDING]),
+                extract('epoch', func.now()) > extract('epoch', Request.created_at) + (func.coalesce(Request.sla_response_time_hours, 2) * 3600)
+            )
+        )
     )
     
     if division_id:
-        query = query.filter(Request.requester_division_id == division_id)
+        compliant_responses = compliant_responses.filter(Request.requester_division_id == division_id)
+        total_evaluated_query = total_evaluated_query.filter(Request.requester_division_id == division_id)
     if start_date:
-        query = query.filter(Request.created_at >= start_date)
+        compliant_responses = compliant_responses.filter(Request.created_at >= start_date)
+        total_evaluated_query = total_evaluated_query.filter(Request.created_at >= start_date)
     if end_date:
-        query = query.filter(Request.created_at <= end_date)
+        compliant_responses = compliant_responses.filter(Request.created_at <= end_date)
+        total_evaluated_query = total_evaluated_query.filter(Request.created_at <= end_date)
+        
+    compliant_count = compliant_responses.scalar() or 0
+    total_count = total_evaluated_query.scalar() or 0
     
-    requests = query.all()
-    if not requests:
-        return 0.0
-    
-    # Response time score (10%)
-    response_on_time = sum(
-        1 for r in requests 
-        if r.actual_response_time <= r.sla_response_deadline
-    )
-    response_score = (response_on_time / len(requests)) * 10
+    response_score = (compliant_count / total_count * 10) if total_count > 0 else 10.0
     
     # Completion time score (10%) - from SLA compliance
     completion_rate = calculate_sla_compliance_rate(

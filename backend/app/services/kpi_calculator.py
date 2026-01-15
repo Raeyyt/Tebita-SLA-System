@@ -100,21 +100,36 @@ def calculate_kpi_metrics(db: Session, department_id: int = None, division_id: i
 # ============================================================================
 
 def calculate_sla_compliance_rate(db: Session, division_id: int = None, department_id: int = None, start_date: datetime = None, end_date: datetime = None):
-    """Calculates SLA compliance rate using SQL aggregations"""
-    query = db.query(Request).filter(Request.status == RequestStatus.COMPLETED)
-    if start_date: query = query.filter(Request.created_at >= start_date)
-    if end_date: query = query.filter(Request.created_at <= end_date)
-    if division_id: query = query.filter(Request.assigned_division_id == division_id)
-    if department_id: query = query.filter(Request.assigned_department_id == department_id)
+    """Calculates SLA compliance rate using SQL aggregations, including active overdue requests"""
+    # 1. Count compliant completed
+    compliant_query = db.query(func.count(Request.id)).filter(
+        Request.status == RequestStatus.COMPLETED,
+        Request.actual_completion_time <= Request.sla_completion_deadline
+    )
     
-    # Use SQL to compare times
-    stats = query.with_entities(
-        func.count(Request.id).label("total"),
-        func.count(case((Request.actual_completion_time <= Request.sla_completion_deadline, 1))).label("compliant")
-    ).one()
+    # 2. Count total evaluated (Completed + Active Overdue)
+    total_query = db.query(func.count(Request.id)).filter(
+        or_(
+            Request.status == RequestStatus.COMPLETED,
+            and_(
+                Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVAL_PENDING]),
+                extract('epoch', func.now()) > extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
+            )
+        )
+    )
     
-    if stats.total == 0: return 100.0
-    return (stats.compliant / stats.total) * 100.0
+    # Apply common filters
+    for q in [compliant_query, total_query]:
+        if start_date: q = q.filter(Request.created_at >= start_date)
+        if end_date: q = q.filter(Request.created_at <= end_date)
+        if division_id: q = q.filter(Request.assigned_division_id == division_id)
+        if department_id: q = q.filter(Request.assigned_department_id == department_id)
+        
+    compliant = compliant_query.scalar() or 0
+    total = total_query.scalar() or 0
+    
+    if total == 0: return 100.0
+    return round((compliant / total) * 100.0, 1)
 
 def calculate_service_request_fulfillment_rate(db: Session, division_id: int = None, start_date: datetime = None, end_date: datetime = None):
     """Calculates fulfillment rate using SQL aggregations"""
