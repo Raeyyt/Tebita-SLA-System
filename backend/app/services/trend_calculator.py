@@ -6,7 +6,7 @@ Supports daily, weekly, monthly, and yearly aggregations
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Literal
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, or_
 from collections import defaultdict
 
 from app.models import Request, RequestStatus, Priority, ResourceType, Division, Department
