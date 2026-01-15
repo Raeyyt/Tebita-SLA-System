@@ -495,9 +495,12 @@ export default function UserManagement() {
                   <label className="form-label">Username *</label>
                   <input
                     type="text"
+                    id="username"
+                    name="username"
                     className="form-input"
                     value={formData.username}
                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    autoComplete="off"
                   />
                   {formErrors.username && (
                     <small style={{ color: 'var(--error)' }}>{formErrors.username}</small>
