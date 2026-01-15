@@ -38,13 +38,17 @@ async def get_sla_compliance(
     base_query = apply_role_based_filtering(base_query, current_user)
     
     # 1. Get stats for completed requests
-    # We use 24 hours as default if sla_completion_time_hours is null
     completed_stats = db.query(
         func.count(Request.id).label("total"),
         func.count(case((
-            extract('epoch', Request.actual_completion_time) <= 
-            extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600),
-            1
+            and_(
+                # Response SLA met
+                extract('epoch', Request.actual_response_time) <= 
+                extract('epoch', Request.created_at) + (func.coalesce(Request.sla_response_time_hours, 2) * 3600),
+                # Resolution SLA met
+                extract('epoch', Request.actual_completion_time) <= 
+                extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
+            ), 1
         ))).label("within_sla"),
         func.avg(
             extract('epoch', Request.actual_completion_time) - extract('epoch', Request.created_at)
@@ -52,15 +56,23 @@ async def get_sla_compliance(
     ).filter(
         base_query.whereclause,
         Request.status == RequestStatus.COMPLETED,
-        Request.actual_completion_time.isnot(None)
+        Request.actual_completion_time.isnot(None),
+        Request.actual_response_time.isnot(None)
     ).one()
     
-    # 2. Get active overdue requests
+    # 2. Get active overdue requests (either response or resolution overdue)
     overdue_active = db.query(func.count(Request.id)).filter(
         base_query.whereclause,
         Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
-        extract('epoch', func.now()) > 
-        extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
+        or_(
+            # Response overdue (if not yet acknowledged)
+            and_(
+                Request.acknowledged_at.is_(None),
+                extract('epoch', func.now()) > extract('epoch', Request.created_at) + (func.coalesce(Request.sla_response_time_hours, 2) * 3600)
+            ),
+            # Resolution overdue
+            extract('epoch', func.now()) > extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
+        )
     ).scalar() or 0
     
     # Total calculations
@@ -151,12 +163,19 @@ async def get_sla_dashboard(
     base_query = apply_role_based_filtering(base_query, current_user)
     
     # Categorize by SLA status in one query
-    # elapsed_hours = (now - created_at)
-    # percent = (elapsed_hours / target_hours) * 100
     now_epoch = extract('epoch', func.now())
     created_epoch = extract('epoch', Request.created_at)
-    target_seconds = func.coalesce(Request.sla_completion_time_hours, 24) * 3600
-    percent_consumed = ((now_epoch - created_epoch) / target_seconds) * 100
+    
+    # Response consumption (if not acknowledged)
+    resp_target = func.coalesce(Request.sla_response_time_hours, 2) * 3600
+    resp_percent = case((Request.acknowledged_at.is_(None), ((now_epoch - created_epoch) / resp_target) * 100), else_=0)
+    
+    # Resolution consumption
+    res_target = func.coalesce(Request.sla_completion_time_hours, 24) * 3600
+    res_percent = ((now_epoch - created_epoch) / res_target) * 100
+    
+    # Composite percent (the worse of the two)
+    percent_consumed = func.greatest(resp_percent, res_percent)
     
     stats = db.query(
         func.count(Request.id).label("total_active"),

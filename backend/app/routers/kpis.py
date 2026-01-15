@@ -232,25 +232,31 @@ async def get_kpi_dashboard(
         }
     
     # 2. SLA Compliance (SQL-based)
-    # We need to count compliant completed and total evaluated (completed + active overdue)
+    # A request is compliant ONLY if both response and resolution SLAs are met
     now_epoch = extract('epoch', func.now())
     created_epoch = extract('epoch', Request.created_at)
-    target_seconds = func.coalesce(Request.sla_completion_time_hours, 24) * 3600
+    resp_target = func.coalesce(Request.sla_response_time_hours, 2) * 3600
+    res_target = func.coalesce(Request.sla_completion_time_hours, 24) * 3600
     
     sla_stats = db.query(
         func.count(case((
             and_(
-                Request.status == RequestStatus.COMPLETED,
-                extract('epoch', Request.actual_completion_time) <= created_epoch + target_seconds
+                # Response SLA met
+                extract('epoch', Request.actual_response_time) <= created_epoch + resp_target,
+                # Resolution SLA met
+                extract('epoch', Request.actual_completion_time) <= created_epoch + res_target
             ), 1
         ))).label("compliant"),
         func.count(case((
             or_(
                 Request.status == RequestStatus.COMPLETED,
+                # Response overdue (if not yet acknowledged)
                 and_(
-                    Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
-                    now_epoch > created_epoch + target_seconds
-                )
+                    Request.acknowledged_at.is_(None),
+                    now_epoch > created_epoch + resp_target
+                ),
+                # Resolution overdue
+                now_epoch > created_epoch + res_target
             ), 1
         ))).label("evaluated"),
         func.avg(
@@ -345,8 +351,16 @@ def calculate_scorecard(db: Session, start: datetime, end: datetime, division_id
     within_sla = 0
     for req in completed:
         if req.completed_at and req.created_at and req.sla_completion_time_hours:
-            time_taken = (req.completed_at - req.created_at).total_seconds() / 3600
-            if time_taken <= req.sla_completion_time_hours:
+            # Check both Response and Resolution
+            resp_compliant = True
+            if req.actual_response_time:
+                resp_time = (req.actual_response_time - req.created_at).total_seconds() / 3600
+                resp_compliant = resp_time <= (req.sla_response_time_hours or 2)
+            
+            res_time = (req.completed_at - req.created_at).total_seconds() / 3600
+            res_compliant = res_time <= req.sla_completion_time_hours
+            
+            if resp_compliant and res_compliant:
                 within_sla += 1
     
     # Add active overdue requests to calculation
@@ -354,9 +368,17 @@ def calculate_scorecard(db: Session, start: datetime, end: datetime, division_id
     now = datetime.utcnow()
     for req in requests:
         if req.status in [RequestStatus.PENDING, RequestStatus.IN_PROGRESS]:
+            # Response overdue?
+            if not req.acknowledged_at:
+                resp_deadline = req.created_at + timedelta(hours=req.sla_response_time_hours or 2)
+                if now > resp_deadline:
+                    active_overdue += 1
+                    continue # Already overdue
+            
+            # Resolution overdue?
             if req.created_at and req.sla_completion_time_hours:
-                deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
-                if now > deadline:
+                res_deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
+                if now > res_deadline:
                     active_overdue += 1
     
     total_evaluated = len(completed) + active_overdue

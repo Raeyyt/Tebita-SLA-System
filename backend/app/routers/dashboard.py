@@ -42,20 +42,24 @@ def get_dashboard_stats(
     ).scalar() or 0
     
     # 3. SLA compliance (SQL-based)
+    # A request is compliant ONLY if both response and resolution SLAs are met
     compliance_stats = db.query(
         func.count(Request.id).label("total_completed"),
         func.count(case((
             and_(
-                Request.completed_at.isnot(None),
-                Request.created_at.isnot(None),
-                Request.sla_completion_time_hours.isnot(None),
-                (extract('epoch', Request.completed_at) - extract('epoch', Request.created_at)) / 3600 <= Request.sla_completion_time_hours
+                # Response SLA met
+                extract('epoch', Request.actual_response_time) <= 
+                extract('epoch', Request.created_at) + (func.coalesce(Request.sla_response_time_hours, 2) * 3600),
+                # Resolution SLA met
+                extract('epoch', Request.actual_completion_time) <= 
+                extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
             ), 1
         ))).label("compliant")
     ).filter(
         base_query.whereclause,
         Request.status == RequestStatus.COMPLETED,
-        Request.sla_completion_time_hours.isnot(None)
+        Request.actual_completion_time.isnot(None),
+        Request.actual_response_time.isnot(None)
     ).one()
     
     sla_compliance = round((compliance_stats.compliant / compliance_stats.total_completed * 100) if compliance_stats.total_completed else 0, 1)

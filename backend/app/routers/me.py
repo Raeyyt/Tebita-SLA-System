@@ -43,29 +43,42 @@ async def get_me_dashboard(
         # 2. SLA Compliance (SQL-based)
         now_epoch = extract('epoch', func.now())
         created_epoch = extract('epoch', Request.created_at)
-        target_seconds = func.coalesce(Request.sla_completion_time_hours, 24) * 3600
+        resp_target = func.coalesce(Request.sla_response_time_hours, 2) * 3600
+        res_target = func.coalesce(Request.sla_completion_time_hours, 24) * 3600
         
         sla_stats = db.query(
             func.count(case((
                 and_(
-                    Request.status == RequestStatus.COMPLETED,
-                    Request.completed_at >= month_start,
-                    extract('epoch', Request.actual_completion_time) <= created_epoch + target_seconds
+                    # Response SLA met
+                    extract('epoch', Request.actual_response_time) <= created_epoch + resp_target,
+                    # Resolution SLA met
+                    extract('epoch', Request.actual_completion_time) <= created_epoch + res_target
                 ), 1
             ))).label("compliant"),
             func.count(case((
                 or_(
                     and_(Request.status == RequestStatus.COMPLETED, Request.completed_at >= month_start),
+                    # Response overdue (if not yet acknowledged)
                     and_(
-                        Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
-                        now_epoch > created_epoch + target_seconds
-                    )
+                        Request.acknowledged_at.is_(None),
+                        now_epoch > created_epoch + resp_target
+                    ),
+                    # Resolution overdue
+                    now_epoch > created_epoch + res_target
                 ), 1
             ))).label("evaluated"),
             func.count(case((
-                and_(
-                    Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
-                    now_epoch > created_epoch + target_seconds
+                or_(
+                    # Response overdue (if not yet acknowledged)
+                    and_(
+                        Request.acknowledged_at.is_(None),
+                        now_epoch > created_epoch + resp_target
+                    ),
+                    # Resolution overdue (active only)
+                    and_(
+                        Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
+                        now_epoch > created_epoch + res_target
+                    )
                 ), 1
             ))).label("overdue_active")
         ).filter(base_query.whereclause).one()
