@@ -484,6 +484,11 @@ export const api = {
     },
 
     // System Settings
+    getSettings: async (token: string) => {
+        const response = await client.get('/settings', withAuth(token));
+        return response.data;
+    },
+
     getEmailNotificationStatus: async (token: string) => {
         const response = await client.get('/settings/email-notifications/status', withAuth(token));
         return response.data;

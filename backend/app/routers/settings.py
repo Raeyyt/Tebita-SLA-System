@@ -107,6 +107,11 @@ async def update_smtp_settings(
     
     for key, value in config.items():
         if key in allowed_keys:
+            # Skip empty password (means don't change)
+            if key == "smtp_password" and not value:
+                print(f"DEBUG: Skipping empty {key}")
+                continue
+                
             print(f"DEBUG: Updating setting {key}...")
             setting = db.query(SystemSettings).filter(
                 SystemSettings.setting_key == key

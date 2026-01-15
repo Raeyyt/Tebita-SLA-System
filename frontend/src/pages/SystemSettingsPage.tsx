@@ -27,12 +27,22 @@ export const SystemSettingsPage = () => {
             if (!token) return;
 
             try {
-                const status = await api.getEmailNotificationStatus(token);
+                const [status, allSettings] = await Promise.all([
+                    api.getEmailNotificationStatus(token),
+                    api.getSettings(token)
+                ]);
+
                 setEmailEnabled(status.enabled);
 
-                // Note: We don't load existing SMTP password for security, 
-                // but we could load other fields if the API supported it.
-                // For now, we start blank or with defaults.
+                // Populate SMTP config from database
+                if (allSettings) {
+                    setSmtpConfig({
+                        smtp_email: allSettings.smtp_email?.value || '',
+                        smtp_password: '', // Don't load password for security
+                        smtp_host: allSettings.smtp_host?.value || 'smtp.gmail.com',
+                        smtp_port: allSettings.smtp_port?.value || '587'
+                    });
+                }
             } catch (err) {
                 console.error('Failed to load settings:', err);
             } finally {
