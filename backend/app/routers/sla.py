@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func, extract, case, and_
+from sqlalchemy import func, extract, case, and_, or_
 from typing import List
 from datetime import datetime, timedelta
 
@@ -118,7 +118,7 @@ async def get_overdue_requests(
     current_user: User = Depends(get_current_active_user)
 ):
     """Get requests that are overdue using SQL"""
-    from sqlalchemy import extract
+    
     
     # Base query with role-based filtering
     base_query = db.query(Request).filter(
