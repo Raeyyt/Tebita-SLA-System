@@ -1,10 +1,10 @@
 import csv
 import io
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 from pydantic import Field
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 
@@ -161,12 +161,27 @@ async def get_sent_requests(
 @router.post("", response_model=schemas.RequestRead, status_code=status.HTTP_201_CREATED)
 async def create_request(
     request_in: schemas.RequestCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Create a new request with auto-calculated SLA deadlines"""
     print(f"DEBUG: create_request entry - User: {current_user.username}, Role: {current_user.role}")
     
+    # 0. De-duplication check: same requester, same description, same recipient within 60 seconds
+    recent_request = db.query(Request).filter(
+        Request.requester_id == current_user.id,
+        Request.description == request_in.description,
+        Request.assigned_division_id == request_in.assigned_division_id,
+        Request.assigned_department_id == request_in.assigned_department_id,
+        Request.assigned_subdepartment_id == request_in.assigned_subdepartment_id,
+        Request.created_at >= datetime.utcnow() - timedelta(seconds=60)
+    ).first()
+    
+    if recent_request:
+        print(f"DEBUG: Duplicate request detected for user {current_user.username}. Returning existing request.")
+        return recent_request
+
     # 1. Restriction: Admins cannot create requests
     if current_user.role == UserRole.ADMIN:
         print(f"DEBUG: Blocked Admin {current_user.username} from creating request")
@@ -296,11 +311,25 @@ async def create_request(
     except Exception:
         pass
     
-    # Send email notification for HIGH priority requests
-    # Send email notification (for all priorities)
+    # Send email notification (for all priorities) in background to avoid timeouts
+    background_tasks.add_task(_send_request_emails_background, request.id)
+    
+    return request
+
+
+def _send_request_emails_background(request_id: int):
+    """Background task to send email notifications for a new request"""
+    from ..database import SessionLocal
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    db = SessionLocal()
     try:
-        import logging
-        logger = logging.getLogger(__name__)
+        request = db.get(Request, request_id)
+        if not request:
+            logger.warning(f"Background email task: Request {request_id} not found")
+            return
+            
         logger.info(f"Attempting to send email for request {request.request_id}")
         
         from ..services.email_service import email_service
@@ -335,12 +364,11 @@ async def create_request(
         else:
             logger.warning(f"No assigned users found for request {request.request_id}")
     except Exception as e:
-        # Non-fatal: email failures shouldn't break request creation
         import traceback
-        print(f"⚠️ Email notification failed (non-blocking): {e}")
-        print(traceback.format_exc())
-    
-    return request
+        logger.error(f"⚠️ Background email notification failed: {e}")
+        logger.error(traceback.format_exc())
+    finally:
+        db.close()
 
 
 
