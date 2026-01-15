@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, extract, case, and_
 from typing import List
 from datetime import datetime, timedelta
 
@@ -31,64 +31,54 @@ async def get_sla_compliance(
     else:  # month
         start = now - timedelta(days=30)
     
-    # Get all requests in period (not just completed)
-    query = db.query(Request).filter(Request.created_at >= start)
-    query = apply_role_based_filtering(query, current_user)
+    from sqlalchemy import case, extract
     
-    # Get completed requests
-    completed_requests = query.filter(
+    # Base query with role-based filtering
+    base_query = db.query(Request).filter(Request.created_at >= start)
+    base_query = apply_role_based_filtering(base_query, current_user)
+    
+    # 1. Get stats for completed requests
+    # We use 24 hours as default if sla_completion_time_hours is null
+    completed_stats = db.query(
+        func.count(Request.id).label("total"),
+        func.count(case((
+            extract('epoch', Request.actual_completion_time) <= 
+            extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600),
+            1
+        ))).label("within_sla"),
+        func.avg(
+            extract('epoch', Request.actual_completion_time) - extract('epoch', Request.created_at)
+        ).label("avg_time_seconds")
+    ).filter(
+        base_query.whereclause,
         Request.status == RequestStatus.COMPLETED,
-        Request.sla_completion_time_hours.isnot(None),
-        Request.created_at.isnot(None),
         Request.actual_completion_time.isnot(None)
-    ).all()
+    ).one()
     
-    within_sla = 0
-    overdue_completed = 0
-    total_completion_time = 0
-    
-    DEFAULT_SLA_HOURS = 96
-    
-    # Check completed requests
-    for req in completed_requests:
-        target_hours = req.sla_completion_time_hours or DEFAULT_SLA_HOURS
-        deadline = req.created_at + timedelta(hours=target_hours)
-        
-        if req.actual_completion_time <= deadline:
-            within_sla += 1
-        else:
-            overdue_completed += 1
-        
-        if req.completed_at and req.created_at:
-            total_completion_time += (req.completed_at - req.created_at).total_seconds() / 3600
-    
-    # Get active overdue requests
-    active_requests = query.filter(
+    # 2. Get active overdue requests
+    overdue_active = db.query(func.count(Request.id)).filter(
+        base_query.whereclause,
         Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
-        Request.sla_completion_time_hours.isnot(None),
-        Request.created_at.isnot(None)
-    ).all()
-    
-    overdue_active = 0
-    for req in active_requests:
-        target_hours = req.sla_completion_time_hours or DEFAULT_SLA_HOURS
-        deadline = req.created_at + timedelta(hours=target_hours)
-        if now > deadline:
-            overdue_active += 1
+        extract('epoch', func.now()) > 
+        extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
+    ).scalar() or 0
     
     # Total calculations
-    total = len(completed_requests) + len(active_requests)
-    total_evaluated = within_sla + overdue_completed + overdue_active
+    total_requests = db.query(func.count(Request.id)).filter(base_query.whereclause).scalar() or 0
+    within_sla = completed_stats.within_sla or 0
+    overdue_completed = (completed_stats.total or 0) - within_sla
+    
+    total_evaluated = (completed_stats.total or 0) + overdue_active
     total_overdue = overdue_completed + overdue_active
     compliance_rate = (within_sla / total_evaluated * 100) if total_evaluated > 0 else 100
-    avg_time = total_completion_time / len(completed_requests) if completed_requests else 0
+    avg_time_hours = (completed_stats.avg_time_seconds / 3600) if completed_stats.avg_time_seconds else 0
     
     return {
-        "total_requests": total,
+        "total_requests": total_requests,
         "within_sla": within_sla,
         "overdue": total_overdue,
         "compliance_rate": round(compliance_rate, 2),
-        "average_completion_time": round(avg_time, 2),
+        "average_completion_time": round(avg_time_hours, 2),
         "period": period,
     }
 
@@ -114,30 +104,36 @@ async def get_overdue_requests(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get requests that are overdue"""
-    now = datetime.utcnow()
+    """Get requests that are overdue using SQL"""
+    from sqlalchemy import extract
     
-    # Get in-progress and pending requests
-    query = db.query(Request).filter(
-        Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVED]),
-        Request.sla_completion_time_hours.isnot(None)
+    # Base query with role-based filtering
+    base_query = db.query(Request).filter(
+        Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVED])
     )
-    query = apply_role_based_filtering(query, current_user)
-    active_requests = query.all()
+    base_query = apply_role_based_filtering(base_query, current_user)
     
-    overdue = []
-    for req in active_requests:
-        if req.created_at and req.sla_completion_time_hours:
-            deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
-            if now > deadline:
-                time_overdue = (now - deadline).total_seconds() / 3600
-                overdue.append({
-                    "request": req,
-                    "deadline": deadline,
-                    "hours_overdue": round(time_overdue, 2),
-                })
+    # Get overdue requests directly in SQL
+    overdue_requests = db.query(Request).filter(
+        base_query.whereclause,
+        Request.sla_completion_time_hours.isnot(None),
+        extract('epoch', func.now()) > 
+        extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
+    ).all()
     
-    return overdue
+    # Format response
+    now = datetime.utcnow()
+    results = []
+    for req in overdue_requests:
+        deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours or 24)
+        time_overdue = (now - deadline).total_seconds() / 3600
+        results.append({
+            "request": req,
+            "deadline": deadline,
+            "hours_overdue": round(time_overdue, 2),
+        })
+    
+    return results
 
 
 @router.get("/dashboard")
@@ -145,54 +141,45 @@ async def get_sla_dashboard(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get SLA dashboard data"""
-    now = datetime.utcnow()
+    """Get SLA dashboard data using SQL aggregations"""
+    from sqlalchemy import case, extract
     
-    # Active requests
-    query = db.query(Request).filter(
+    # Base query with role-based filtering
+    base_query = db.query(Request).filter(
         Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVED])
     )
-    query = apply_role_based_filtering(query, current_user)
-    active_requests = query.all()
+    base_query = apply_role_based_filtering(base_query, current_user)
     
-    # Categorize by SLA status
-    on_track = 0
-    at_risk_50 = 0  # 50-80% consumed
-    critical_80 = 0  # 80%+ consumed
-    overdue_count = 0
+    # Categorize by SLA status in one query
+    # elapsed_hours = (now - created_at)
+    # percent = (elapsed_hours / target_hours) * 100
+    now_epoch = extract('epoch', func.now())
+    created_epoch = extract('epoch', Request.created_at)
+    target_seconds = func.coalesce(Request.sla_completion_time_hours, 24) * 3600
+    percent_consumed = ((now_epoch - created_epoch) / target_seconds) * 100
     
-    DEFAULT_SLA_HOURS = 24
-
-    for req in active_requests:
-        if req.created_at:
-            elapsed = (now - req.created_at).total_seconds() / 3600
-            target = req.sla_completion_time_hours or DEFAULT_SLA_HOURS
-            percent_consumed = (elapsed / target * 100) if target > 0 else 0
-            
-            if percent_consumed >= 100:
-                overdue_count += 1
-            elif percent_consumed >= 80:
-                critical_80 += 1
-            elif percent_consumed >= 50:
-                at_risk_50 += 1
-            else:
-                on_track += 1
+    stats = db.query(
+        func.count(Request.id).label("total_active"),
+        func.count(case((percent_consumed >= 100, 1))).label("overdue"),
+        func.count(case((and_(percent_consumed >= 80, percent_consumed < 100), 1))).label("critical"),
+        func.count(case((and_(percent_consumed >= 50, percent_consumed < 80), 1))).label("at_risk"),
+        func.count(case((percent_consumed < 50, 1))).label("on_track")
+    ).filter(base_query.whereclause).one()
     
     # Today's compliance
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    query = db.query(Request).filter(
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_completed = db.query(func.count(Request.id)).filter(
+        apply_role_based_filtering(db.query(Request), current_user).whereclause,
         Request.status == RequestStatus.COMPLETED,
         Request.completed_at >= today_start
-    )
-    query = apply_role_based_filtering(query, current_user)
-    today_completed = query.count()
+    ).scalar() or 0
     
     return {
-        "active_requests": len(active_requests),
-        "on_track": on_track,
-        "at_risk_50_percent": at_risk_50,
-        "critical_80_percent": critical_80,
-        "overdue": overdue_count,
+        "active_requests": stats.total_active or 0,
+        "on_track": stats.on_track or 0,
+        "at_risk_50_percent": stats.at_risk or 0,
+        "critical_80_percent": stats.critical or 0,
+        "overdue": stats.overdue or 0,
         "completed_today": today_completed,
     }
 

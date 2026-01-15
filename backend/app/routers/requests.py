@@ -40,12 +40,20 @@ def generate_request_id(db: Session, request_type: str) -> str:
     
     # Get count of requests today with this specific prefix
     # We filter by the ID string itself to handle multiple request types sharing the same prefix
-    count = db.query(Request).filter(
-        Request.request_id.like(f"{prefix}%")
-    ).count()
+    print(f"DEBUG: generate_request_id - Prefix: {prefix}")
+    try:
+        count = db.query(Request).filter(
+            Request.request_id.like(f"{prefix}%")
+        ).count()
+        print(f"DEBUG: generate_request_id - Count today: {count}")
+    except Exception as e:
+        print(f"DEBUG: generate_request_id - Query failed: {e}")
+        raise
     
     sequence = str(count + 1).zfill(3)
-    return f"{prefix}{sequence}"
+    request_id = f"{prefix}{sequence}"
+    print(f"DEBUG: generate_request_id - Generated ID: {request_id}")
+    return request_id
 
 
 @router.get("", response_model=List[schemas.RequestRead])
@@ -240,9 +248,11 @@ async def create_request(
     try:
         db.add(request)
         db.flush()  # Get request.id without committing
-        print(f"DEBUG: Request flushed, ID: {request.id}")
+        print(f"DEBUG: Request flushed successfully, ID: {request.id}")
     except Exception as e:
-        print(f"DEBUG: Error adding/flushing request: {e}")
+        print(f"DEBUG: Error adding/flushing request: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to save request: {str(e)}")
     

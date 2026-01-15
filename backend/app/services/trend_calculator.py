@@ -66,51 +66,61 @@ def calculate_request_volume_trend(
     custom_end: Optional[datetime] = None
 ) -> Dict:
     """
-    Calculate request volume over time
-    Returns data for line chart showing total, pending, completed
+    Calculate request volume over time using SQL GROUP BY
     """
     start_date, end_date = get_time_range(period, custom_start, custom_end)
-    labels = generate_time_labels(start_date, end_date, period)
     
-    # Query all requests in period
-    requests = db.query(Request).filter(
+    # Map period to date_trunc interval
+    trunc_map = {
+        "daily": "day",
+        "weekly": "week",
+        "monthly": "month",
+        "yearly": "year"
+    }
+    interval = trunc_map.get(period, "month")
+    
+    # Query with GROUP BY
+    from sqlalchemy import case
+    results = db.query(
+        func.date_trunc(interval, Request.created_at).label("time_bucket"),
+        func.count(Request.id).label("total"),
+        func.count(case((Request.status == RequestStatus.PENDING, 1))).label("pending"),
+        func.count(case((Request.status == RequestStatus.COMPLETED, 1))).label("completed"),
+        func.count(case((Request.status == RequestStatus.REJECTED, 1))).label("rejected")
+    ).filter(
         Request.created_at >= start_date,
         Request.created_at <= end_date
-    ).all()
+    ).group_by("time_bucket").order_by("time_bucket").all()
     
-    # Initialize data buckets
-    total_data = {label: 0 for label in labels}
-    pending_data = {label: 0 for label in labels}
-    completed_data = {label: 0 for label in labels}
-    rejected_data = {label: 0 for label in labels}
+    # Format labels and data
+    labels = []
+    total_data = []
+    pending_data = []
+    completed_data = []
+    rejected_data = []
     
-    # Aggregate by time period
-    for request in requests:
+    for r in results:
         if period == "daily":
-            label = request.created_at.strftime("%b %d")
+            labels.append(r.time_bucket.strftime("%b %d"))
         elif period == "weekly":
-            label = request.created_at.strftime("Week %U")
+            labels.append(r.time_bucket.strftime("Week %U"))
         elif period == "monthly":
-            label = request.created_at.strftime("%b %Y")
-        else:  # yearly
-            label = request.created_at.strftime("%Y")
-        
-        if label in total_data:
-            total_data[label] += 1
-            if request.status == RequestStatus.PENDING:
-                pending_data[label] += 1
-            elif request.status == RequestStatus.COMPLETED:
-                completed_data[label] += 1
-            elif request.status == RequestStatus.REJECTED:
-                rejected_data[label] += 1
+            labels.append(r.time_bucket.strftime("%b %Y"))
+        else:
+            labels.append(r.time_bucket.strftime("%Y"))
+            
+        total_data.append(r.total)
+        pending_data.append(r.pending)
+        completed_data.append(r.completed)
+        rejected_data.append(r.rejected)
     
     return {
         "labels": labels,
         "datasets": [
-            {"label": "Total Requests", "data": [total_data[l] for l in labels]},
-            {"label": "Pending", "data": [pending_data[l] for l in labels]},
-            {"label": "Completed", "data": [completed_data[l] for l in labels]},
-            {"label": "Rejected", "data": [rejected_data[l] for l in labels]}
+            {"label": "Total Requests", "data": total_data},
+            {"label": "Pending", "data": pending_data},
+            {"label": "Completed", "data": completed_data},
+            {"label": "Rejected", "data": rejected_data}
         ]
     }
 
@@ -122,48 +132,55 @@ def calculate_sla_compliance_trend(
     custom_end: Optional[datetime] = None
 ) -> Dict:
     """
-    Calculate SLA compliance rate over time
-    Returns data for area chart
+    Calculate SLA compliance rate over time using SQL GROUP BY
     """
     start_date, end_date = get_time_range(period, custom_start, custom_end)
-    labels = generate_time_labels(start_date, end_date, period)
+    interval = {"daily": "day", "weekly": "week", "monthly": "month", "yearly": "year"}.get(period, "month")
     
-    # Query completed requests in period
-    requests = db.query(Request).filter(
+    from sqlalchemy import case, extract, and_
+    
+    # We need to count compliant completed and total evaluated (completed + active overdue)
+    now_epoch = extract('epoch', func.now())
+    created_epoch = extract('epoch', Request.created_at)
+    target_seconds = func.coalesce(Request.sla_completion_time_hours, 24) * 3600
+    
+    results = db.query(
+        func.date_trunc(interval, Request.created_at).label("time_bucket"),
+        func.count(case((
+            and_(
+                Request.status == RequestStatus.COMPLETED,
+                extract('epoch', Request.actual_completion_time) <= created_epoch + target_seconds
+            ), 1
+        ))).label("compliant"),
+        func.count(case((
+            or_(
+                Request.status == RequestStatus.COMPLETED,
+                and_(
+                    Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
+                    now_epoch > created_epoch + target_seconds
+                )
+            ), 1
+        ))).label("evaluated")
+    ).filter(
         Request.created_at >= start_date,
-        Request.created_at <= end_date,
-        Request.status == RequestStatus.COMPLETED,
-        Request.actual_completion_time.isnot(None),
-        Request.sla_completion_deadline.isnot(None)
-    ).all()
+        Request.created_at <= end_date
+    ).group_by("time_bucket").order_by("time_bucket").all()
     
-    # Calculate compliance for each period
-    total_per_period = {label: 0 for label in labels}
-    on_time_per_period = {label: 0 for label in labels}
-    
-    for request in requests:
-        if period == "daily":
-            label = request.created_at.strftime("%b %d")
-        elif period == "weekly":
-            label = request.created_at.strftime("Week %U")
-        elif period == "monthly":
-            label = request.created_at.strftime("%b %Y")
-        else:
-            label = request.created_at.strftime("%Y")
-        
-        if label in total_per_period:
-            total_per_period[label] += 1
-            if request.actual_completion_time <= request.sla_completion_deadline:
-                on_time_per_period[label] += 1
-    
-    # Calculate percentages
+    labels = []
     compliance_data = []
-    for label in labels:
-        if total_per_period[label] > 0:
-            compliance = (on_time_per_period[label] / total_per_period[label]) * 100
-            compliance_data.append(round(compliance, 2))
+    
+    for r in results:
+        if period == "daily":
+            labels.append(r.time_bucket.strftime("%b %d"))
+        elif period == "weekly":
+            labels.append(r.time_bucket.strftime("Week %U"))
+        elif period == "monthly":
+            labels.append(r.time_bucket.strftime("%b %Y"))
         else:
-            compliance_data.append(0)
+            labels.append(r.time_bucket.strftime("%Y"))
+            
+        rate = (r.compliant / r.evaluated * 100) if r.evaluated > 0 else 100
+        compliance_data.append(round(rate, 2))
     
     return {
         "labels": labels,
@@ -179,15 +196,13 @@ def calculate_requests_by_division(
     end_date: Optional[datetime] = None
 ) -> Dict:
     """
-    Calculate request distribution by division
-    Returns data for pie chart
+    Calculate request distribution by division using SQL GROUP BY
     """
     if not start_date:
         start_date = datetime.utcnow() - timedelta(days=30)
     if not end_date:
         end_date = datetime.utcnow()
     
-    # Query with division join
     results = db.query(
         Division.name,
         func.count(Request.id).label('count')
@@ -209,45 +224,47 @@ def calculate_requests_by_priority(
     custom_end: Optional[datetime] = None
 ) -> Dict:
     """
-    Calculate request distribution by priority over time
-    Returns data for stacked bar chart
+    Calculate request distribution by priority over time using SQL GROUP BY
     """
     start_date, end_date = get_time_range(period, custom_start, custom_end)
-    labels = generate_time_labels(start_date, end_date, period)
+    interval = {"daily": "day", "weekly": "week", "monthly": "month", "yearly": "year"}.get(period, "month")
     
-    requests = db.query(Request).filter(
+    from sqlalchemy import case
+    results = db.query(
+        func.date_trunc(interval, Request.created_at).label("time_bucket"),
+        func.count(case((Request.priority == Priority.HIGH, 1))).label("high"),
+        func.count(case((Request.priority == Priority.MEDIUM, 1))).label("medium"),
+        func.count(case((Request.priority == Priority.LOW, 1))).label("low")
+    ).filter(
         Request.created_at >= start_date,
         Request.created_at <= end_date
-    ).all()
+    ).group_by("time_bucket").order_by("time_bucket").all()
     
-    high_data = {label: 0 for label in labels}
-    medium_data = {label: 0 for label in labels}
-    low_data = {label: 0 for label in labels}
+    labels = []
+    high_data = []
+    medium_data = []
+    low_data = []
     
-    for request in requests:
+    for r in results:
         if period == "daily":
-            label = request.created_at.strftime("%b %d")
+            labels.append(r.time_bucket.strftime("%b %d"))
         elif period == "weekly":
-            label = request.created_at.strftime("Week %U")
+            labels.append(r.time_bucket.strftime("Week %U"))
         elif period == "monthly":
-            label = request.created_at.strftime("%b %Y")
+            labels.append(r.time_bucket.strftime("%b %Y"))
         else:
-            label = request.created_at.strftime("%Y")
-        
-        if label in high_data:
-            if request.priority == Priority.HIGH:
-                high_data[label] += 1
-            elif request.priority == Priority.MEDIUM:
-                medium_data[label] += 1
-            else:
-                low_data[label] += 1
+            labels.append(r.time_bucket.strftime("%Y"))
+            
+        high_data.append(r.high)
+        medium_data.append(r.medium)
+        low_data.append(r.low)
     
     return {
         "labels": labels,
         "datasets": [
-            {"label": "High", "data": [high_data[l] for l in labels]},
-            {"label": "Medium", "data": [medium_data[l] for l in labels]},
-            {"label": "Low", "data": [low_data[l] for l in labels]}
+            {"label": "High", "data": high_data},
+            {"label": "Medium", "data": medium_data},
+            {"label": "Low", "data": low_data}
         ]
     }
 
@@ -258,39 +275,28 @@ def calculate_response_time_by_resource(
     end_date: Optional[datetime] = None
 ) -> Dict:
     """
-    Calculate average response time by resource type
-    Returns data for bar chart
+    Calculate average response time by resource type using SQL GROUP BY
     """
     if not start_date:
         start_date = datetime.utcnow() - timedelta(days=30)
     if not end_date:
         end_date = datetime.utcnow()
     
-    resource_types = [ResourceType.FLEET, ResourceType.HR, ResourceType.FINANCE, 
-                      ResourceType.ICT, ResourceType.LOGISTICS, ResourceType.FACILITIES]
-    
-    labels = []
-    data = []
-    
-    for resource_type in resource_types:
-        requests = db.query(Request).filter(
-            Request.resource_type == resource_type,
-            Request.actual_response_time.isnot(None),
-            Request.created_at >= start_date,
-            Request.created_at <= end_date
-        ).all()
-        
-        if requests:
-            avg_response = sum(
-                (r.actual_response_time - r.created_at).total_seconds() / 3600
-                for r in requests
-            ) / len(requests)
-            labels.append(resource_type.value)
-            data.append(round(avg_response, 2))
+    from sqlalchemy import extract
+    results = db.query(
+        Request.resource_type,
+        func.avg(
+            extract('epoch', Request.actual_response_time) - extract('epoch', Request.created_at)
+        ).label("avg_seconds")
+    ).filter(
+        Request.actual_response_time.isnot(None),
+        Request.created_at >= start_date,
+        Request.created_at <= end_date
+    ).group_by(Request.resource_type).all()
     
     return {
-        "labels": labels,
-        "data": data
+        "labels": [r[0].value for r in results],
+        "data": [round(r.avg_seconds / 3600, 2) if r.avg_seconds else 0 for r in results]
     }
 
 
@@ -300,8 +306,7 @@ def calculate_request_status_distribution(
     end_date: Optional[datetime] = None
 ) -> Dict:
     """
-    Calculate current request status distribution
-    Returns data for donut chart
+    Calculate current request status distribution using SQL GROUP BY
     """
     if not start_date:
         start_date = datetime.utcnow() - timedelta(days=30)
@@ -329,42 +334,34 @@ def calculate_satisfaction_trend(
     custom_end: Optional[datetime] = None
 ) -> Dict:
     """
-    Calculate satisfaction ratings over time
-    Returns data for line chart
+    Calculate satisfaction ratings over time using SQL GROUP BY
     """
     start_date, end_date = get_time_range(period, custom_start, custom_end)
-    labels = generate_time_labels(start_date, end_date, period)
+    interval = {"daily": "day", "weekly": "week", "monthly": "month", "yearly": "year"}.get(period, "month")
     
-    requests = db.query(Request).filter(
+    results = db.query(
+        func.date_trunc(interval, Request.created_at).label("time_bucket"),
+        func.avg(Request.satisfaction_rating).label("avg_rating")
+    ).filter(
         Request.created_at >= start_date,
         Request.created_at <= end_date,
         Request.satisfaction_rating.isnot(None)
-    ).all()
+    ).group_by("time_bucket").order_by("time_bucket").all()
     
-    # Calculate average satisfaction for each period
-    total_per_period = {label: [] for label in labels}
-    
-    for request in requests:
-        if period == "daily":
-            label = request.created_at.strftime("%b %d")
-        elif period == "weekly":
-            label = request.created_at.strftime("Week %U")
-        elif period == "monthly":
-            label = request.created_at.strftime("%b %Y")
-        else:
-            label = request.created_at.strftime("%Y")
-        
-        if label in total_per_period:
-            total_per_period[label].append(request.satisfaction_rating)
-    
-    # Calculate averages
+    labels = []
     satisfaction_data = []
-    for label in labels:
-        if total_per_period[label]:
-            avg = sum(total_per_period[label]) / len(total_per_period[label])
-            satisfaction_data.append(round(avg, 2))
+    
+    for r in results:
+        if period == "daily":
+            labels.append(r.time_bucket.strftime("%b %d"))
+        elif period == "weekly":
+            labels.append(r.time_bucket.strftime("Week %U"))
+        elif period == "monthly":
+            labels.append(r.time_bucket.strftime("%b %Y"))
         else:
-            satisfaction_data.append(0)
+            labels.append(r.time_bucket.strftime("%Y"))
+            
+        satisfaction_data.append(round(r.avg_rating, 2) if r.avg_rating else 0)
     
     return {
         "labels": labels,
@@ -381,45 +378,41 @@ def calculate_service_efficiency_trend(
     custom_end: Optional[datetime] = None
 ) -> Dict:
     """
-    Calculate Service Efficiency score over time
-    Based on completion time vs baseline (72h)
-    Returns data for line chart
+    Calculate Service Efficiency score over time using SQL GROUP BY
     """
     start_date, end_date = get_time_range(period, custom_start, custom_end)
-    labels = generate_time_labels(start_date, end_date, period)
+    interval = {"daily": "day", "weekly": "week", "monthly": "month", "yearly": "year"}.get(period, "month")
     
-    # Query completed requests in period
-    requests = db.query(Request).filter(
+    from sqlalchemy import extract
+    results = db.query(
+        func.date_trunc(interval, Request.created_at).label("time_bucket"),
+        func.avg(
+            extract('epoch', Request.completed_at) - extract('epoch', Request.created_at)
+        ).label("avg_seconds")
+    ).filter(
         Request.created_at >= start_date,
         Request.created_at <= end_date,
         Request.status == RequestStatus.COMPLETED,
         Request.completed_at.isnot(None)
-    ).all()
+    ).group_by("time_bucket").order_by("time_bucket").all()
     
-    # Group by period
-    period_requests = {label: [] for label in labels}
-    
-    for request in requests:
-        if period == "daily":
-            label = request.created_at.strftime("%b %d")
-        elif period == "weekly":
-            label = request.created_at.strftime("Week %U")
-        elif period == "monthly":
-            label = request.created_at.strftime("%b %Y")
-        else:
-            label = request.created_at.strftime("%Y")
-        
-        if label in period_requests:
-            period_requests[label].append(request)
-            
-    # Calculate efficiency for each period
+    labels = []
     efficiency_data = []
-    for label in labels:
-        reqs = period_requests[label]
-        if reqs:
-            avg_time = sum([(r.completed_at - r.created_at).total_seconds() / 3600 for r in reqs]) / len(reqs)
+    
+    for r in results:
+        if period == "daily":
+            labels.append(r.time_bucket.strftime("%b %d"))
+        elif period == "weekly":
+            labels.append(r.time_bucket.strftime("Week %U"))
+        elif period == "monthly":
+            labels.append(r.time_bucket.strftime("%b %Y"))
+        else:
+            labels.append(r.time_bucket.strftime("%Y"))
+            
+        if r.avg_seconds:
+            avg_hours = r.avg_seconds / 3600
             # 72 hours baseline
-            score = min(100, max(0, 100 - (avg_time / 72 * 100)))
+            score = min(100, max(0, 100 - (avg_hours / 72 * 100)))
             efficiency_data.append(round(score, 2))
         else:
             efficiency_data.append(0)

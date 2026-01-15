@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, extract, case, and_
 from typing import List
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -201,17 +201,26 @@ async def get_kpi_dashboard(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Get KPI dashboard overview"""
+    """Get KPI dashboard overview using SQL aggregations"""
+    from sqlalchemy import case, extract, and_
     
     now = datetime.utcnow()
     month_start = now - timedelta(days=30)
     
-    # Get all requests for the month
-    query = db.query(Request).filter(Request.created_at >= month_start)
-    query = apply_role_based_filtering(query, current_user)
-    requests = query.all()
+    # Base query with role-based filtering
+    base_query = db.query(Request).filter(Request.created_at >= month_start)
+    base_query = apply_role_based_filtering(base_query, current_user)
     
-    if not requests:
+    # 1. Base Stats and Priority Breakdown in one query
+    stats = db.query(
+        func.count(Request.id).label("total"),
+        func.count(case((Request.priority == Priority.HIGH, 1))).label("high"),
+        func.count(case((Request.priority == Priority.MEDIUM, 1))).label("medium"),
+        func.count(case((Request.priority == Priority.LOW, 1))).label("low"),
+        func.count(case((Request.status == RequestStatus.REJECTED, 1))).label("rejected")
+    ).filter(base_query.whereclause).one()
+    
+    if stats.total == 0:
         return {
             "total_requests": 0,
             "avg_response_time": 0,
@@ -219,73 +228,56 @@ async def get_kpi_dashboard(
             "sla_compliance_rate": 0,
             "satisfaction_avg": 0,
             "rejection_rate": 0,
-            "priority_breakdown": {
-                "high": 0,
-                "medium": 0,
-                "low": 0
-            }
+            "priority_breakdown": {"high": 0, "medium": 0, "low": 0}
         }
     
-    # Calculate metrics
-    total = len(requests)
-    response_times = []
-    completion_times = []
-    within_sla = 0
+    # 2. SLA Compliance (SQL-based)
+    # We need to count compliant completed and total evaluated (completed + active overdue)
+    now_epoch = extract('epoch', func.now())
+    created_epoch = extract('epoch', Request.created_at)
+    target_seconds = func.coalesce(Request.sla_completion_time_hours, 24) * 3600
     
-    compliant = 0
-    non_compliant = 0
-    now = datetime.utcnow()
+    sla_stats = db.query(
+        func.count(case((
+            and_(
+                Request.status == RequestStatus.COMPLETED,
+                extract('epoch', Request.actual_completion_time) <= created_epoch + target_seconds
+            ), 1
+        ))).label("compliant"),
+        func.count(case((
+            or_(
+                Request.status == RequestStatus.COMPLETED,
+                and_(
+                    Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]),
+                    now_epoch > created_epoch + target_seconds
+                )
+            ), 1
+        ))).label("evaluated"),
+        func.avg(
+            case((
+                Request.status == RequestStatus.COMPLETED,
+                extract('epoch', Request.actual_completion_time) - created_epoch
+            ))
+        ).label("avg_completion_seconds")
+    ).filter(base_query.whereclause).one()
     
-    # Check completed requests
-    for req in requests:
-        if req.status == RequestStatus.COMPLETED:
-            if req.created_at and req.completed_at and req.sla_completion_time_hours:
-                completion_time = (req.completed_at - req.created_at).total_seconds() / 3600
-                completion_times.append(completion_time)
-                
-                deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
-                if req.actual_completion_time and req.actual_completion_time <= deadline:
-                    compliant += 1
-                else:
-                    non_compliant += 1
+    sla_rate = (sla_stats.compliant / sla_stats.evaluated * 100) if sla_stats.evaluated > 0 else 100
+    avg_completion = (sla_stats.avg_completion_seconds / 3600) if sla_stats.avg_completion_seconds else 0
     
-    # Check active overdue requests
-    overdue_active = 0
-    for req in requests:
-        if req.status in [RequestStatus.PENDING, RequestStatus.IN_PROGRESS]:
-            if req.created_at and req.sla_completion_time_hours:
-                deadline = req.created_at + timedelta(hours=req.sla_completion_time_hours)
-                if now > deadline:
-                    overdue_active += 1
-    
-    # Calculate SLA rate with active overdue included
-    total_evaluated = compliant + non_compliant + overdue_active
-    sla_rate = (compliant / total_evaluated * 100) if total_evaluated > 0 else 100
-    avg_completion = sum(completion_times) / len(completion_times) if completion_times else 0
-    
-    # Calculate satisfaction score
+    # 3. Satisfaction Score
     satisfaction_score = calculate_customer_satisfaction_score(db, start_date=month_start, end_date=now)
     
-    # Calculate rejection rate
-    rejected_count = len([r for r in requests if r.status == RequestStatus.REJECTED])
-    rejection_rate = (rejected_count / total * 100) if total > 0 else 0
-
-    # Calculate priority breakdown
-    high_priority = len([r for r in requests if r.priority == Priority.HIGH])
-    medium_priority = len([r for r in requests if r.priority == Priority.MEDIUM])
-    low_priority = len([r for r in requests if r.priority == Priority.LOW])
-
     return {
-        "total_requests": total,
+        "total_requests": stats.total,
         "avg_response_time": 0,  # Placeholder
         "avg_completion_time": round(avg_completion, 2),
         "sla_compliance_rate": round(sla_rate, 2),
         "satisfaction_avg": round(satisfaction_score, 1),
-        "rejection_rate": round(rejection_rate, 1),
+        "rejection_rate": round((stats.rejected / stats.total * 100), 1),
         "priority_breakdown": {
-            "high": high_priority,
-            "medium": medium_priority,
-            "low": low_priority
+            "high": stats.high,
+            "medium": stats.medium,
+            "low": stats.low
         }
     }
 

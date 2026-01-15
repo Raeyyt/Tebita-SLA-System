@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, case, extract
 from typing import Dict, Any, List
 from datetime import datetime, timedelta
 
@@ -16,53 +16,55 @@ async def get_admin_dashboard(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Full system dashboard for ADMIN users"""
+    """Full system dashboard for ADMIN users using optimized SQL"""
     if current_user.role != "ADMIN":
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    # System-wide statistics
-    total_requests = db.query(Request).count()
-    pending = db.query(Request).filter(Request.status == RequestStatus.PENDING).count()
-    in_progress = db.query(Request).filter(Request.status == RequestStatus.IN_PROGRESS).count()
-    completed = db.query(Request).filter(Request.status == RequestStatus.COMPLETED).count()
+    from sqlalchemy import case
     
-    # Division breakdown
-    divisions = db.query(Division).all()
-    division_stats = []
-    for div in divisions:
-        div_requests = db.query(Request).filter(
-            Request.assigned_division_id == div.id
-        ).count()
-        division_stats.append({
-            "id": div.id,
-            "name": div.name,
-            "total_requests": div_requests
-        })
+    # 1. System-wide statistics in one query
+    stats = db.query(
+        func.count(Request.id).label("total"),
+        func.count(case((Request.status == RequestStatus.PENDING, 1))).label("pending"),
+        func.count(case((Request.status == RequestStatus.IN_PROGRESS, 1))).label("in_progress"),
+        func.count(case((Request.status == RequestStatus.COMPLETED, 1))).label("completed")
+    ).one()
     
-    # Department breakdown
-    departments = db.query(Department).all()
-    dept_stats = []
-    for dept in departments:
-        dept_requests = db.query(Request).filter(
-            Request.assigned_department_id == dept.id
-        ).count()
-        dept_stats.append({
-            "id": dept.id,
-            "name": dept.name,
-            "division_id": dept.division_id,
-            "total_requests": dept_requests
-        })
+    # 2. Division breakdown in one query
+    division_results = db.query(
+        Division.id,
+        Division.name,
+        func.count(Request.id).label('count')
+    ).outerjoin(Request, Request.assigned_division_id == Division.id).group_by(Division.id, Division.name).all()
     
-    # Recent activity
+    division_stats = [
+        {"id": r.id, "name": r.name, "total_requests": r.count}
+        for r in division_results
+    ]
+    
+    # 3. Department breakdown in one query
+    department_results = db.query(
+        Department.id,
+        Department.name,
+        Department.division_id,
+        func.count(Request.id).label('count')
+    ).outerjoin(Request, Request.assigned_department_id == Department.id).group_by(Department.id, Department.name, Department.division_id).all()
+    
+    dept_stats = [
+        {"id": r.id, "name": r.name, "division_id": r.division_id, "total_requests": r.count}
+        for r in department_results
+    ]
+    
+    # 4. Recent activity
     recent_requests = db.query(Request).order_by(Request.created_at.desc()).limit(10).all()
     
     return {
         "role": "ADMIN",
         "summary": {
-            "total_requests": total_requests,
-            "pending": pending,
-            "in_progress": in_progress,
-            "completed": completed
+            "total_requests": stats.total or 0,
+            "pending": stats.pending or 0,
+            "in_progress": stats.in_progress or 0,
+            "completed": stats.completed or 0
         },
         "divisions": division_stats,
         "departments": dept_stats,
@@ -83,59 +85,41 @@ async def get_division_dashboard(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Division-specific dashboard for DIVISION_MANAGER users"""
+    """Division-specific dashboard for DIVISION_MANAGER users using optimized SQL"""
     if current_user.role != "DIVISION_MANAGER":
         raise HTTPException(status_code=403, detail="Division manager access required")
     
     if not current_user.division_id:
         raise HTTPException(status_code=400, detail="User not assigned to a division")
     
+    from sqlalchemy import case
+    
     # Division statistics
     division = db.query(Division).filter(Division.id == current_user.division_id).first()
     if not division:
         raise HTTPException(status_code=404, detail="Division not found")
     
-    # Requests for this division
-    total_requests = db.query(Request).filter(
-        Request.assigned_division_id == current_user.division_id
-    ).count()
+    # 1. Requests for this division in one query
+    stats = db.query(
+        func.count(Request.id).label("total"),
+        func.count(case((Request.status == RequestStatus.PENDING, 1))).label("pending"),
+        func.count(case((Request.status == RequestStatus.IN_PROGRESS, 1))).label("in_progress"),
+        func.count(case((Request.status == RequestStatus.COMPLETED, 1))).label("completed")
+    ).filter(Request.assigned_division_id == current_user.division_id).one()
     
-    pending = db.query(Request).filter(
-        and_(
-            Request.assigned_division_id == current_user.division_id,
-            Request.status == RequestStatus.PENDING
-        )
-    ).count()
-    
-    in_progress = db.query(Request).filter(
-        and_(
-            Request.assigned_division_id == current_user.division_id,
-            Request.status == RequestStatus.IN_PROGRESS
-        )
-    ).count()
-    
-    completed = db.query(Request).filter(
-        and_(
-            Request.assigned_division_id == current_user.division_id,
-            Request.status == RequestStatus.COMPLETED
-        )
-    ).count()
-    
-    # Department breakdown within division
-    departments = db.query(Department).filter(
+    # 2. Department breakdown within division in one query
+    department_results = db.query(
+        Department.id,
+        Department.name,
+        func.count(Request.id).label('count')
+    ).outerjoin(Request, Request.assigned_department_id == Department.id).filter(
         Department.division_id == current_user.division_id
-    ).all()
+    ).group_by(Department.id, Department.name).all()
     
-    dept_stats = []
-    for dept in departments:
-        dept_requests = db.query(Request).filter(
-            Request.assigned_department_id == dept.id
-        ).count()
-        dept_stats.append({
-            "id": dept.id,
-            "name": dept.name,
-            "total_requests": dept_requests
-        })
+    dept_stats = [
+        {"id": r.id, "name": r.name, "total_requests": r.count}
+        for r in department_results
+    ]
     
     return {
         "role": "DIVISION_MANAGER",
@@ -145,10 +129,10 @@ async def get_division_dashboard(
             "type": division.type.value
         },
         "summary": {
-            "total_requests": total_requests,
-            "pending": pending,
-            "in_progress": in_progress,
-            "completed": completed
+            "total_requests": stats.total or 0,
+            "pending": stats.pending or 0,
+            "in_progress": stats.in_progress or 0,
+            "completed": stats.completed or 0
         },
         "departments": dept_stats
     }
@@ -159,59 +143,41 @@ async def get_department_dashboard(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Department-specific dashboard for DEPARTMENT_HEAD users"""
+    """Department-specific dashboard for DEPARTMENT_HEAD users using optimized SQL"""
     if current_user.role != "DEPARTMENT_HEAD":
         raise HTTPException(status_code=403, detail="Department head access required")
     
     if not current_user.department_id:
         raise HTTPException(status_code=400, detail="User not assigned to a department")
     
+    from sqlalchemy import case
+    
     # Department statistics
     department = db.query(Department).filter(Department.id == current_user.department_id).first()
     if not department:
         raise HTTPException(status_code=404, detail="Department not found")
     
-    # Requests for this department
-    total_requests = db.query(Request).filter(
-        Request.assigned_department_id == current_user.department_id
-    ).count()
+    # 1. Requests for this department in one query
+    stats = db.query(
+        func.count(Request.id).label("total"),
+        func.count(case((Request.status == RequestStatus.PENDING, 1))).label("pending"),
+        func.count(case((Request.status == RequestStatus.IN_PROGRESS, 1))).label("in_progress"),
+        func.count(case((Request.status == RequestStatus.COMPLETED, 1))).label("completed")
+    ).filter(Request.assigned_department_id == current_user.department_id).one()
     
-    pending = db.query(Request).filter(
-        and_(
-            Request.assigned_department_id == current_user.department_id,
-            Request.status == RequestStatus.PENDING
-        )
-    ).count()
-    
-    in_progress = db.query(Request).filter(
-        and_(
-            Request.assigned_department_id == current_user.department_id,
-            Request.status == RequestStatus.IN_PROGRESS
-        )
-    ).count()
-    
-    completed = db.query(Request).filter(
-        and_(
-            Request.assigned_department_id == current_user.department_id,
-            Request.status == RequestStatus.COMPLETED
-        )
-    ).count()
-    
-    # Sub-department breakdown
-    subdepartments = db.query(SubDepartment).filter(
+    # 2. Sub-department breakdown in one query
+    subdepartment_results = db.query(
+        SubDepartment.id,
+        SubDepartment.name,
+        func.count(Request.id).label('count')
+    ).outerjoin(Request, Request.assigned_subdepartment_id == SubDepartment.id).filter(
         SubDepartment.department_id == current_user.department_id
-    ).all()
+    ).group_by(SubDepartment.id, SubDepartment.name).all()
     
-    subdept_stats = []
-    for subdept in subdepartments:
-        subdept_requests = db.query(Request).filter(
-            Request.assigned_subdepartment_id == subdept.id
-        ).count()
-        subdept_stats.append({
-            "id": subdept.id,
-            "name": subdept.name,
-            "total_requests": subdept_requests
-        })
+    subdept_stats = [
+        {"id": r.id, "name": r.name, "total_requests": r.count}
+        for r in subdepartment_results
+    ]
     
     return {
         "role": "DEPARTMENT_HEAD",
@@ -221,10 +187,10 @@ async def get_department_dashboard(
             "division_id": department.division_id
         },
         "summary": {
-            "total_requests": total_requests,
-            "pending": pending,
-            "in_progress": in_progress,
-            "completed": completed
+            "total_requests": stats.total or 0,
+            "pending": stats.pending or 0,
+            "in_progress": stats.in_progress or 0,
+            "completed": stats.completed or 0
         },
         "subdepartments": subdept_stats
     }
@@ -235,27 +201,32 @@ async def get_staff_dashboard(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Simple dashboard for SUB_DEPARTMENT_STAFF users"""
+    """Simple dashboard for SUB_DEPARTMENT_STAFF users using optimized SQL"""
     if current_user.role != "SUB_DEPARTMENT_STAFF":
         raise HTTPException(status_code=403, detail="Staff access required")
     
-    # My sent requests
-    sent_requests = db.query(Request).filter(
+    from sqlalchemy import case
+    
+    # 1. My sent and received requests in one query
+    # This is a bit tricky since they are different filters. 
+    # We'll use two simple counts or one query with union/case if possible.
+    # For staff, simple counts are usually fine as they are indexed.
+    
+    sent_requests = db.query(func.count(Request.id)).filter(
         Request.requester_id == current_user.id
-    ).count()
+    ).scalar() or 0
     
-    # My received requests
-    received_requests = db.query(Request).filter(
-        Request.assigned_subdepartment_id == current_user.subdepartment_id
-    ).count() if current_user.subdepartment_id else 0
-    
-    # Pending requests I need to handle
-    pending_to_handle = db.query(Request).filter(
-        and_(
-            Request.assigned_subdepartment_id == current_user.subdepartment_id,
-            Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS])
-        )
-    ).count() if current_user.subdepartment_id else 0
+    if current_user.subdepartment_id:
+        received_stats = db.query(
+            func.count(Request.id).label("total"),
+            func.count(case((Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS]), 1))).label("pending")
+        ).filter(Request.assigned_subdepartment_id == current_user.subdepartment_id).one()
+        
+        received_requests = received_stats.total or 0
+        pending_to_handle = received_stats.pending or 0
+    else:
+        received_requests = 0
+        pending_to_handle = 0
     
     return {
         "role": "SUB_DEPARTMENT_STAFF",
