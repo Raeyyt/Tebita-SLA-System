@@ -64,6 +64,58 @@ def backup_sqlite() -> Path:
         return None
 
 
+def backup_postgresql() -> Path:
+    """Backup PostgreSQL database using pg_dump."""
+    import subprocess
+    from urllib.parse import urlparse
+    
+    try:
+        url = urlparse(settings.database_url)
+        username = url.username
+        password = url.password
+        host = url.hostname
+        port = url.port or 5432
+        dbname = url.path.lstrip('/')
+
+        backup_path = BACKUP_DIR / get_backup_filename()
+        
+        # Set password in environment for pg_dump to avoid interactive prompt
+        env = os.environ.copy()
+        if password:
+            env["PGPASSWORD"] = password
+
+        # Use custom format (-Fc) which is compressed and flexible
+        cmd = [
+            "pg_dump",
+            "-h", host,
+            "-p", str(port),
+            "-U", username,
+            "-F", "c",
+            "-f", str(backup_path),
+            dbname
+        ]
+
+        # Run pg_dump
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            print(f"[Backup] ERROR: pg_dump failed - {result.stderr}")
+            # Fallback to a simple message if pg_dump is missing
+            if "not found" in result.stderr.lower() or "not recognized" in result.stderr.lower():
+                print("[Backup] ERROR: 'pg_dump' utility not found on system path.")
+            return None
+
+        file_size = backup_path.stat().st_size / 1024  # Size in KB
+        print(f"[Backup] SUCCESS: PostgreSQL backup created - {backup_path.name} ({file_size:.2f} KB)")
+        
+        cleanup_old_backups()
+        return backup_path
+        
+    except Exception as e:
+        print(f"[Backup] ERROR: PostgreSQL backup failed - {e}")
+        return None
+
+
 def create_database_backup() -> Path:
     """
     Create a database backup based on the configured database type.
@@ -76,8 +128,7 @@ def create_database_backup() -> Path:
     if settings.database_url.startswith("sqlite"):
         return backup_sqlite()
     else:
-        print(f"[Backup] ERROR: PostgreSQL backup not implemented yet. Using SQLite method.")
-        return backup_sqlite()
+        return backup_postgresql()
 
 
 def get_latest_backup() -> Path:
