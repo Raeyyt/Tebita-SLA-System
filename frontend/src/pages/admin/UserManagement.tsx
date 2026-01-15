@@ -498,7 +498,6 @@ export default function UserManagement() {
                     className="form-input"
                     value={formData.username}
                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    disabled={!!editingUser}
                   />
                   {formErrors.username && (
                     <small style={{ color: 'var(--error)' }}>{formErrors.username}</small>

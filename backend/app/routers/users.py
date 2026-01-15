@@ -77,6 +77,12 @@ def update_user(
     
     update_data = user_update.dict(exclude_unset=True)
     
+    # Handle username update (check uniqueness)
+    if 'username' in update_data and update_data['username'] != db_user.username:
+        existing_user = db.query(User).filter(User.username == update_data['username']).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Username already taken")
+
     # Handle password update separately if provided
     if 'password' in update_data and update_data['password']:
         update_data['hashed_password'] = get_password_hash(update_data.pop('password'))
