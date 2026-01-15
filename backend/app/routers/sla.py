@@ -38,26 +38,29 @@ async def get_sla_compliance(
     base_query = apply_role_based_filtering(base_query, current_user)
     
     # 1. Get stats for completed requests
+    actual_resp = func.coalesce(Request.actual_response_time, Request.acknowledged_at)
+    actual_comp = func.coalesce(Request.actual_completion_time, Request.completed_at)
+    
     completed_stats = db.query(
         func.count(Request.id).label("total"),
         func.count(case((
             and_(
+                actual_resp.isnot(None),
+                actual_comp.isnot(None),
                 # Response SLA met
-                extract('epoch', Request.actual_response_time) <= 
+                extract('epoch', actual_resp) <= 
                 extract('epoch', Request.created_at) + (func.coalesce(Request.sla_response_time_hours, 2) * 3600),
                 # Resolution SLA met
-                extract('epoch', Request.actual_completion_time) <= 
+                extract('epoch', actual_comp) <= 
                 extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
             ), 1
         ))).label("within_sla"),
         func.avg(
-            extract('epoch', Request.actual_completion_time) - extract('epoch', Request.created_at)
+            extract('epoch', actual_comp) - extract('epoch', Request.created_at)
         ).label("avg_time_seconds")
     ).filter(
         base_query.whereclause,
-        Request.status == RequestStatus.COMPLETED,
-        Request.actual_completion_time.isnot(None),
-        Request.actual_response_time.isnot(None)
+        Request.status == RequestStatus.COMPLETED
     ).one()
     
     # 2. Get active overdue requests (either response or resolution overdue)
@@ -128,9 +131,15 @@ async def get_overdue_requests(
     # Get overdue requests directly in SQL
     overdue_requests = db.query(Request).filter(
         base_query.whereclause,
-        Request.sla_completion_time_hours.isnot(None),
-        extract('epoch', func.now()) > 
-        extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
+        or_(
+            # Response overdue (if not yet acknowledged)
+            and_(
+                Request.acknowledged_at.is_(None),
+                extract('epoch', func.now()) > extract('epoch', Request.created_at) + (func.coalesce(Request.sla_response_time_hours, 2) * 3600)
+            ),
+            # Resolution overdue
+            extract('epoch', func.now()) > extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
+        )
     ).all()
     
     # Format response

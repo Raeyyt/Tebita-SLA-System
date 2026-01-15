@@ -43,23 +43,27 @@ def get_dashboard_stats(
     
     # 3. SLA compliance (SQL-based)
     # A request is compliant ONLY if both response and resolution SLAs are met
+    # We use COALESCE to support older requests that only have acknowledged_at/completed_at
+    actual_resp = func.coalesce(Request.actual_response_time, Request.acknowledged_at)
+    actual_comp = func.coalesce(Request.actual_completion_time, Request.completed_at)
+    
     compliance_stats = db.query(
         func.count(Request.id).label("total_completed"),
         func.count(case((
             and_(
+                actual_resp.isnot(None),
+                actual_comp.isnot(None),
                 # Response SLA met
-                extract('epoch', Request.actual_response_time) <= 
+                extract('epoch', actual_resp) <= 
                 extract('epoch', Request.created_at) + (func.coalesce(Request.sla_response_time_hours, 2) * 3600),
                 # Resolution SLA met
-                extract('epoch', Request.actual_completion_time) <= 
+                extract('epoch', actual_comp) <= 
                 extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
             ), 1
         ))).label("compliant")
     ).filter(
         base_query.whereclause,
-        Request.status == RequestStatus.COMPLETED,
-        Request.actual_completion_time.isnot(None),
-        Request.actual_response_time.isnot(None)
+        Request.status == RequestStatus.COMPLETED
     ).one()
     
     sla_compliance = round((compliance_stats.compliant / compliance_stats.total_completed * 100) if compliance_stats.total_completed else 0, 1)

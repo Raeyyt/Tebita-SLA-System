@@ -46,13 +46,18 @@ async def get_me_dashboard(
         resp_target = func.coalesce(Request.sla_response_time_hours, 2) * 3600
         res_target = func.coalesce(Request.sla_completion_time_hours, 24) * 3600
         
+        actual_resp = func.coalesce(Request.actual_response_time, Request.acknowledged_at)
+        actual_comp = func.coalesce(Request.actual_completion_time, Request.completed_at)
+        
         sla_stats = db.query(
             func.count(case((
                 and_(
+                    actual_resp.isnot(None),
+                    actual_comp.isnot(None),
                     # Response SLA met
-                    extract('epoch', Request.actual_response_time) <= created_epoch + resp_target,
+                    extract('epoch', actual_resp) <= created_epoch + resp_target,
                     # Resolution SLA met
-                    extract('epoch', Request.actual_completion_time) <= created_epoch + res_target
+                    extract('epoch', actual_comp) <= created_epoch + res_target
                 ), 1
             ))).label("compliant"),
             func.count(case((

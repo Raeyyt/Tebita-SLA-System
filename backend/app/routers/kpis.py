@@ -238,13 +238,18 @@ async def get_kpi_dashboard(
     resp_target = func.coalesce(Request.sla_response_time_hours, 2) * 3600
     res_target = func.coalesce(Request.sla_completion_time_hours, 24) * 3600
     
+    actual_resp = func.coalesce(Request.actual_response_time, Request.acknowledged_at)
+    actual_comp = func.coalesce(Request.actual_completion_time, Request.completed_at)
+    
     sla_stats = db.query(
         func.count(case((
             and_(
+                actual_resp.isnot(None),
+                actual_comp.isnot(None),
                 # Response SLA met
-                extract('epoch', Request.actual_response_time) <= created_epoch + resp_target,
+                extract('epoch', actual_resp) <= created_epoch + resp_target,
                 # Resolution SLA met
-                extract('epoch', Request.actual_completion_time) <= created_epoch + res_target
+                extract('epoch', actual_comp) <= created_epoch + res_target
             ), 1
         ))).label("compliant"),
         func.count(case((
@@ -262,7 +267,7 @@ async def get_kpi_dashboard(
         func.avg(
             case((
                 Request.status == RequestStatus.COMPLETED,
-                extract('epoch', Request.actual_completion_time) - created_epoch
+                extract('epoch', actual_comp) - created_epoch
             ))
         ).label("avg_completion_seconds")
     ).filter(base_query.whereclause).one()
@@ -350,14 +355,18 @@ def calculate_scorecard(db: Session, start: datetime, end: datetime, division_id
     # 2. SLA Compliance (30%)
     within_sla = 0
     for req in completed:
-        if req.completed_at and req.created_at and req.sla_completion_time_hours:
+        # Use fallback for older requests
+        actual_resp_time = req.actual_response_time or req.acknowledged_at
+        actual_comp_time = req.actual_completion_time or req.completed_at
+        
+        if actual_comp_time and req.created_at and req.sla_completion_time_hours:
             # Check both Response and Resolution
             resp_compliant = True
-            if req.actual_response_time:
-                resp_time = (req.actual_response_time - req.created_at).total_seconds() / 3600
+            if actual_resp_time:
+                resp_time = (actual_resp_time - req.created_at).total_seconds() / 3600
                 resp_compliant = resp_time <= (req.sla_response_time_hours or 2)
             
-            res_time = (req.completed_at - req.created_at).total_seconds() / 3600
+            res_time = (actual_comp_time - req.created_at).total_seconds() / 3600
             res_compliant = res_time <= req.sla_completion_time_hours
             
             if resp_compliant and res_compliant:
