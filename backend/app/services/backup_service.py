@@ -137,9 +137,31 @@ def backup_postgresql() -> Path:
         if password:
             env["PGPASSWORD"] = password
 
+        # Find pg_dump executable
+        pg_dump_cmd = "pg_dump"
+        if os.name == 'nt': # Windows
+            # Check if pg_dump is in PATH
+            import subprocess as sp
+            try:
+                sp.run(["pg_dump", "--version"], capture_output=True, check=True)
+            except (sp.CalledProcessError, FileNotFoundError):
+                # Not in path, try common installation locations
+                log_debug("[Backup] pg_dump not in PATH, searching in Program Files...")
+                pg_base = Path("C:/Program Files/PostgreSQL")
+                if pg_base.exists():
+                    # Find the latest version bin folder
+                    versions = sorted([d for d in pg_base.iterdir() if d.is_dir() and d.name.isdigit()], 
+                                     key=lambda x: int(x.name), reverse=True)
+                    for v in versions:
+                        candidate = v / "bin" / "pg_dump.exe"
+                        if candidate.exists():
+                            pg_dump_cmd = str(candidate)
+                            log_debug(f"[Backup] Found pg_dump at: {pg_dump_cmd}")
+                            break
+
         # Use custom format (-Fc) which is compressed and flexible
         cmd = [
-            "pg_dump",
+            pg_dump_cmd,
             "-h", host,
             "-p", str(port),
             "-U", username,
