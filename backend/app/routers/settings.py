@@ -291,3 +291,29 @@ async def download_backup(
         filename=filename,
         media_type='application/octet-stream'
     )
+
+@router.get("/backups")
+async def list_backups(
+    current_user: User = Depends(get_current_active_user)
+):
+    """List all available database backup files (admin only)"""
+    if current_user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    from ..services.backup_service import BACKUP_DIR
+    
+    if not BACKUP_DIR.exists():
+        return []
+        
+    backups = []
+    for f in BACKUP_DIR.glob("tebita_backup_*"):
+        stats = f.stat()
+        backups.append({
+            "filename": f.name,
+            "size_kb": round(stats.st_size / 1024, 2),
+            "created_at": datetime.fromtimestamp(stats.st_mtime).isoformat()
+        })
+    
+    # Sort by creation time (newest first)
+    backups.sort(key=lambda x: x["created_at"], reverse=True)
+    return backups

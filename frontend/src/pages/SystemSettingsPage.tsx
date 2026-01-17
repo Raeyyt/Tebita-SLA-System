@@ -22,6 +22,21 @@ export const SystemSettingsPage = () => {
     const [healthStatus, setHealthStatus] = useState<any>(null);
     const [testingSystem, setTestingSystem] = useState(false);
     const [backupFilename, setBackupFilename] = useState<string | null>(null);
+    const [backups, setBackups] = useState<any[]>([]);
+    const [loadingBackups, setLoadingBackups] = useState(false);
+
+    const loadBackups = async () => {
+        if (!token) return;
+        setLoadingBackups(true);
+        try {
+            const data = await api.listBackups(token);
+            setBackups(data);
+        } catch (err) {
+            console.error('Failed to load backups:', err);
+        } finally {
+            setLoadingBackups(false);
+        }
+    };
 
     useEffect(() => {
         const loadSettings = async () => {
@@ -30,8 +45,10 @@ export const SystemSettingsPage = () => {
             try {
                 const [status, allSettings] = await Promise.all([
                     api.getEmailNotificationStatus(token),
-                    api.getSettings(token)
+                    api.getSettings(token),
+                    loadBackups()
                 ]);
+                // ... rest of the function remains the same
 
                 setEmailEnabled(status.enabled);
 
@@ -136,6 +153,7 @@ export const SystemSettingsPage = () => {
             if (result.backup_filename) {
                 setBackupFilename(result.backup_filename);
             }
+            await loadBackups();
         } catch (err) {
             console.error('Failed to reset system data:', err);
             alert('Failed to reset system data. Check console for details.');
@@ -443,6 +461,80 @@ export const SystemSettingsPage = () => {
                                     </div>
                                 </form>
                             )}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Database Backups Section */}
+            <div className="card" style={{ marginTop: '2rem' }}>
+                <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h2 className="card-title">Database Backups</h2>
+                    <button
+                        onClick={loadBackups}
+                        disabled={loadingBackups}
+                        className="btn btn-outline"
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                    >
+                        {loadingBackups ? 'Refreshing...' : 'Refresh List'}
+                    </button>
+                </div>
+                <div style={{ padding: '2rem' }}>
+                    <p className="text-muted" style={{ marginBottom: '1.5rem' }}>
+                        Manage and download safety backups created during system resets or automated maintenance.
+                    </p>
+
+                    {loadingBackups && backups.length === 0 ? (
+                        <div className="spinner"></div>
+                    ) : backups.length > 0 ? (
+                        <div className="table-wrapper" style={{ boxShadow: 'none', border: '1px solid var(--gray-200)' }}>
+                            <table style={{ width: '100%' }}>
+                                <thead>
+                                    <tr style={{ background: 'var(--gray-50)' }}>
+                                        <th style={{ padding: '1rem' }}>Filename</th>
+                                        <th style={{ padding: '1rem' }}>Size</th>
+                                        <th style={{ padding: '1rem' }}>Created At</th>
+                                        <th style={{ padding: '1rem', textAlign: 'right' }}>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {backups.map((backup) => (
+                                        <tr key={backup.filename}>
+                                            <td style={{ padding: '1rem', fontWeight: 500 }}>{backup.filename}</td>
+                                            <td style={{ padding: '1rem' }}>{backup.size_kb} KB</td>
+                                            <td style={{ padding: '1rem' }}>{new Date(backup.created_at).toLocaleString()}</td>
+                                            <td style={{ padding: '1rem', textAlign: 'right' }}>
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            const blob = await api.downloadBackup(token, backup.filename);
+                                                            const url = window.URL.createObjectURL(blob);
+                                                            const link = document.createElement('a');
+                                                            link.href = url;
+                                                            link.setAttribute('download', backup.filename);
+                                                            document.body.appendChild(link);
+                                                            link.click();
+                                                            link.parentNode?.removeChild(link);
+                                                            window.URL.revokeObjectURL(url);
+                                                        } catch (err) {
+                                                            console.error('Download failed:', err);
+                                                            alert('Failed to download backup.');
+                                                        }
+                                                    }}
+                                                    className="btn btn-outline"
+                                                    style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                                                >
+                                                    Download
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <div style={{ textAlign: 'center', padding: '2rem', background: 'var(--gray-50)', borderRadius: '8px' }}>
+                            <p className="text-muted">No backups found.</p>
                         </div>
                     )}
                 </div>

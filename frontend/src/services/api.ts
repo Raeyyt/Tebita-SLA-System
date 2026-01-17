@@ -521,4 +521,9 @@ export const api = {
         });
         return response.data;
     },
+
+    listBackups: async (token: string) => {
+        const response = await client.get('/settings/backups', withAuth(token));
+        return response.data;
+    },
 };

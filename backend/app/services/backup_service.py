@@ -6,6 +6,7 @@ Backups are stored in the `backups/` directory with timestamps.
 """
 import os
 import shutil
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 
@@ -41,7 +42,7 @@ def cleanup_old_backups():
 
 
 def backup_sqlite() -> Path:
-    """Backup SQLite database."""
+    """Backup SQLite database using the safe backup API."""
     try:
         # Extract database path from URL (sqlite:///./tebita.db -> tebita.db)
         db_url = settings.database_url
@@ -50,24 +51,42 @@ def backup_sqlite() -> Path:
         # Handle Windows paths and relative paths
         db_path = Path(db_path_str)
         
+        print(f"[Backup] Attempting to backup SQLite DB: {db_path.absolute()}")
+        
         # If not found, try common locations
         if not db_path.exists():
             # Try relative to backend directory if we are in root
             alt_path = Path("backend") / db_path_str.lstrip("./")
+            print(f"[Backup] Primary path not found, trying alt: {alt_path.absolute()}")
             if alt_path.exists():
                 db_path = alt_path
             else:
                 # Try relative to current directory without ./
                 alt_path = Path(db_path_str.lstrip("./"))
+                print(f"[Backup] Alt path not found, trying another: {alt_path.absolute()}")
                 if alt_path.exists():
                     db_path = alt_path
         
         if not db_path.exists():
-            print(f"[Backup] ERROR: SQLite database not found at {db_path} or common alternatives.")
+            print(f"[Backup] ERROR: SQLite database not found at any expected location.")
             return None
         
-        backup_path = BACKUP_DIR / get_backup_filename()
-        shutil.copy2(str(db_path), str(backup_path))
+        backup_filename = get_backup_filename()
+        backup_path = BACKUP_DIR / backup_filename
+        
+        print(f"[Backup] Creating backup at: {backup_path.absolute()}")
+        
+        # Use sqlite3 backup API for a safe online backup
+        # This avoids "file in use" errors on Windows
+        src_conn = sqlite3.connect(str(db_path))
+        dest_conn = sqlite3.connect(str(backup_path))
+        try:
+            with dest_conn:
+                src_conn.backup(dest_conn)
+            print(f"[Backup] SQLite backup API completed successfully.")
+        finally:
+            dest_conn.close()
+            src_conn.close()
         
         file_size = backup_path.stat().st_size / 1024  # Size in KB
         print(f"[Backup] SUCCESS: SQLite backup created - {backup_path.name} ({file_size:.2f} KB)")
@@ -76,7 +95,9 @@ def backup_sqlite() -> Path:
         return backup_path
         
     except Exception as e:
+        import traceback
         print(f"[Backup] ERROR: SQLite backup failed - {e}")
+        traceback.print_exc()
         return None
 
 
