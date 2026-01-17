@@ -498,50 +498,53 @@ export const RequestViewPage = () => {
                                 }}>
                                     ATTACHMENT
                                 </h3>
-                                {attachments.map((att: any, idx: number) => (
-                                    <div key={idx} style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '0.5rem',
-                                        fontSize: '0.9rem',
-                                        color: '#495057'
-                                    }}>
-                                        <button
-                                            onClick={async () => {
-                                                if (token && att.attachment_path) {
-                                                    try {
-                                                        await api.downloadItemFile(token, att.attachment_path);
-                                                    } catch (error) {
-                                                        console.error('Error downloading file:', error);
-                                                        alert('Failed to download file');
+                                {attachments.map((att: any, idx: number) => {
+                                    if (!att) return null;
+                                    return (
+                                        <div key={idx} style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.5rem',
+                                            fontSize: '0.9rem',
+                                            color: '#495057'
+                                        }}>
+                                            <button
+                                                onClick={async () => {
+                                                    if (token && att.attachment_path) {
+                                                        try {
+                                                            await api.downloadItemFile(token, att.attachment_path);
+                                                        } catch (error) {
+                                                            console.error('Error downloading file:', error);
+                                                            alert('Failed to download file');
+                                                        }
                                                     }
-                                                }
-                                            }}
-                                            style={{
-                                                background: '#3498db',
-                                                color: 'white',
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                padding: '0.4rem 0.8rem',
-                                                fontSize: '0.85rem',
-                                                fontWeight: '500',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '0.5rem',
-                                                transition: 'background-color 0.2s'
-                                            }}
-                                            onMouseOver={(e) => e.currentTarget.style.background = '#2980b9'}
-                                            onMouseOut={(e) => e.currentTarget.style.background = '#3498db'}
-                                            title={att.attachment_filename} // Show filename on hover
-                                        >
-                                            View Uploaded Document
-                                        </button>
-                                        <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>
-                                            {att.attachment_filename}
-                                        </span>
-                                    </div>
-                                ))}
+                                                }}
+                                                style={{
+                                                    background: '#3498db',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '4px',
+                                                    padding: '0.4rem 0.8rem',
+                                                    fontSize: '0.85rem',
+                                                    fontWeight: '500',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.5rem',
+                                                    transition: 'background-color 0.2s'
+                                                }}
+                                                onMouseOver={(e) => e.currentTarget.style.background = '#2980b9'}
+                                                onMouseOut={(e) => e.currentTarget.style.background = '#3498db'}
+                                                title={att.attachment_filename || 'Attachment'} // Show filename on hover
+                                            >
+                                                View Uploaded Document
+                                            </button>
+                                            <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>
+                                                {att.attachment_filename || 'Unknown File'}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         );
                     }

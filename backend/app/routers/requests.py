@@ -634,6 +634,15 @@ async def get_request(
     if not has_access:
         raise HTTPException(status_code=403, detail="Not authorized to view this request")
     
+    # Fix for attachments being returned as string
+    if request.attachments and isinstance(request.attachments, str):
+        import json
+        try:
+            request.attachments = json.loads(request.attachments)
+        except Exception as e:
+            print(f"Error parsing attachments for request {request_id}: {e}")
+            request.attachments = []
+
     return request
 
 
