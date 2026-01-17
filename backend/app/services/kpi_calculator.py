@@ -52,11 +52,15 @@ def calculate_kpi_metrics(db: Session, department_id: int = None, division_id: i
     # We use a subquery or complex case to handle the interval arithmetic safely across DB types
     # For simplicity and cross-DB compatibility, we'll use two counts
     
-    # Count compliant completed
+    # Count compliant completed (Must meet BOTH Response and Resolution SLAs)
     compliant_completed = db.query(func.count(Request.id)).filter(
         *filters,
         Request.status == RequestStatus.COMPLETED,
-        extract('epoch', Request.actual_completion_time) <= extract('epoch', Request.created_at) + (Request.sla_completion_time_hours * 3600)
+        # Resolution SLA met
+        extract('epoch', Request.actual_completion_time) <= extract('epoch', Request.created_at) + (Request.sla_completion_time_hours * 3600),
+        # Response SLA met (actual_response_time or acknowledged_at)
+        extract('epoch', func.coalesce(Request.actual_response_time, Request.acknowledged_at, Request.created_at)) <= 
+        extract('epoch', Request.created_at) + (func.coalesce(Request.sla_response_time_hours, 2) * 3600)
     ).scalar() or 0
     
     # Count total that should have been completed (Completed + Active Overdue)
@@ -106,10 +110,14 @@ def calculate_kpi_metrics(db: Session, department_id: int = None, division_id: i
 
 def calculate_sla_compliance_rate(db: Session, division_id: int = None, department_id: int = None, start_date: datetime = None, end_date: datetime = None):
     """Calculates SLA compliance rate using SQL aggregations, including active overdue requests"""
-    # 1. Count compliant completed
+    # 1. Count compliant completed (Must meet BOTH Response and Resolution SLAs)
     compliant_query = db.query(func.count(Request.id)).filter(
         Request.status == RequestStatus.COMPLETED,
-        Request.actual_completion_time <= Request.sla_completion_deadline
+        # Resolution SLA met
+        Request.actual_completion_time <= Request.sla_completion_deadline,
+        # Response SLA met
+        extract('epoch', func.coalesce(Request.actual_response_time, Request.acknowledged_at, Request.created_at)) <= 
+        extract('epoch', Request.created_at) + (func.coalesce(Request.sla_response_time_hours, 2) * 3600)
     )
     
     # 2. Count total evaluated (Completed + Active Overdue)
