@@ -64,7 +64,9 @@ export const PDFViewerModal = ({ requestId, requestNumber, isOpen, onClose }: PD
         const link = document.createElement('a');
         link.href = pdfUrl;
         link.download = `Request_${requestNumber}.pdf`;
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
     };
 
     return (
