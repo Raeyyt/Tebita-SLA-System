@@ -475,62 +475,78 @@ export const RequestViewPage = () => {
                 </div>
 
                 {/* Request Attachment */}
-                {request.attachments && request.attachments.length > 0 && (
-                    <div style={{ marginBottom: '1.5rem' }}>
-                        <h3 style={{
-                            fontSize: '0.95rem',
-                            fontWeight: '700',
-                            color: '#1B1717',
-                            marginBottom: '0.5rem'
-                        }}>
-                            ATTACHMENT
-                        </h3>
-                        {request.attachments.map((att: any, idx: number) => (
-                            <div key={idx} style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                fontSize: '0.9rem',
-                                color: '#495057'
-                            }}>
-                                <button
-                                    onClick={async () => {
-                                        if (token && att.attachment_path) {
-                                            try {
-                                                await api.downloadItemFile(token, att.attachment_path);
-                                            } catch (error) {
-                                                console.error('Error downloading file:', error);
-                                                alert('Failed to download file');
-                                            }
-                                        }
-                                    }}
-                                    style={{
-                                        background: '#3498db',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        padding: '0.4rem 0.8rem',
-                                        fontSize: '0.85rem',
-                                        fontWeight: '500',
-                                        cursor: 'pointer',
+                {(() => {
+                    let attachments: any[] = [];
+                    try {
+                        if (Array.isArray(request.attachments)) {
+                            attachments = request.attachments;
+                        } else if (typeof request.attachments === 'string') {
+                            attachments = JSON.parse(request.attachments);
+                        }
+                    } catch (e) {
+                        console.error("Failed to parse attachments:", e);
+                    }
+
+                    if (attachments && attachments.length > 0) {
+                        return (
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <h3 style={{
+                                    fontSize: '0.95rem',
+                                    fontWeight: '700',
+                                    color: '#1B1717',
+                                    marginBottom: '0.5rem'
+                                }}>
+                                    ATTACHMENT
+                                </h3>
+                                {attachments.map((att: any, idx: number) => (
+                                    <div key={idx} style={{
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: '0.5rem',
-                                        transition: 'background-color 0.2s'
-                                    }}
-                                    onMouseOver={(e) => e.currentTarget.style.background = '#2980b9'}
-                                    onMouseOut={(e) => e.currentTarget.style.background = '#3498db'}
-                                    title={att.attachment_filename} // Show filename on hover
-                                >
-                                    View Uploaded Document
-                                </button>
-                                <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>
-                                    {att.attachment_filename}
-                                </span>
+                                        fontSize: '0.9rem',
+                                        color: '#495057'
+                                    }}>
+                                        <button
+                                            onClick={async () => {
+                                                if (token && att.attachment_path) {
+                                                    try {
+                                                        await api.downloadItemFile(token, att.attachment_path);
+                                                    } catch (error) {
+                                                        console.error('Error downloading file:', error);
+                                                        alert('Failed to download file');
+                                                    }
+                                                }
+                                            }}
+                                            style={{
+                                                background: '#3498db',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                padding: '0.4rem 0.8rem',
+                                                fontSize: '0.85rem',
+                                                fontWeight: '500',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.5rem',
+                                                transition: 'background-color 0.2s'
+                                            }}
+                                            onMouseOver={(e) => e.currentTarget.style.background = '#2980b9'}
+                                            onMouseOut={(e) => e.currentTarget.style.background = '#3498db'}
+                                            title={att.attachment_filename} // Show filename on hover
+                                        >
+                                            View Uploaded Document
+                                        </button>
+                                        <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>
+                                            {att.attachment_filename}
+                                        </span>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                )}
+                        );
+                    }
+                    return null;
+                })()}
 
                 {/* Priority Type */}
                 <div style={{ marginBottom: '1.5rem' }}>
@@ -556,143 +572,149 @@ export const RequestViewPage = () => {
                 </div>
 
                 {/* Item Description (if single item) */}
-                {request.items && request.items.length === 1 && (
-                    <div style={{ marginBottom: '1.5rem' }}>
-                        <h3 style={{
-                            fontSize: '0.95rem',
-                            fontWeight: '700',
-                            color: '#1B1717',
-                            marginBottom: '0.5rem'
-                        }}>
-                            ITEM DESCRIPTION
-                        </h3>
-                        <div style={{ fontSize: '0.9rem', color: '#495057' }}>
-                            {request.items[0].item_description}
+                {
+                    request.items && request.items.length === 1 && (
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <h3 style={{
+                                fontSize: '0.95rem',
+                                fontWeight: '700',
+                                color: '#1B1717',
+                                marginBottom: '0.5rem'
+                            }}>
+                                ITEM DESCRIPTION
+                            </h3>
+                            <div style={{ fontSize: '0.9rem', color: '#495057' }}>
+                                {request.items[0].item_description}
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )
+                }
 
                 {/* Item Description File */}
-                {request.items && request.items.some(item => item.attachment_filename) && (
-                    <div style={{ marginBottom: '1.5rem' }}>
-                        <h3 style={{
-                            fontSize: '0.95rem',
-                            fontWeight: '700',
-                            color: '#1B1717',
-                            marginBottom: '0.5rem'
-                        }}>
-                            ITEM DESCRIPTION FILE
-                        </h3>
-                        {request.items.filter(item => item.attachment_filename).map((item, idx) => (
-                            <div key={idx} style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                fontSize: '0.9rem',
-                                color: '#495057'
+                {
+                    request.items && request.items.some(item => item.attachment_filename) && (
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <h3 style={{
+                                fontSize: '0.95rem',
+                                fontWeight: '700',
+                                color: '#1B1717',
+                                marginBottom: '0.5rem'
                             }}>
-                                <span style={{ fontSize: '1.2rem' }}></span>
-                                <button
-                                    onClick={async () => {
-                                        if (token && item.attachment_filename) {
-                                            try {
-                                                await api.downloadItemFile(token, item.attachment_filename);
-                                            } catch (error) {
-                                                console.error('Error downloading file:', error);
-                                                alert('Failed to download file');
+                                ITEM DESCRIPTION FILE
+                            </h3>
+                            {request.items.filter(item => item.attachment_filename).map((item, idx) => (
+                                <div key={idx} style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    fontSize: '0.9rem',
+                                    color: '#495057'
+                                }}>
+                                    <span style={{ fontSize: '1.2rem' }}></span>
+                                    <button
+                                        onClick={async () => {
+                                            if (token && item.attachment_filename) {
+                                                try {
+                                                    await api.downloadItemFile(token, item.attachment_filename);
+                                                } catch (error) {
+                                                    console.error('Error downloading file:', error);
+                                                    alert('Failed to download file');
+                                                }
                                             }
-                                        }
-                                    }}
-                                    style={{
-                                        background: 'none',
-                                        border: 'none',
-                                        color: '#3498db',
-                                        textDecoration: 'underline',
-                                        cursor: 'pointer',
-                                        padding: 0,
-                                        fontSize: '0.9rem',
-                                        fontFamily: 'inherit'
-                                    }}
-                                >
-                                    {item.attachment_filename}
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                                        }}
+                                        style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: '#3498db',
+                                            textDecoration: 'underline',
+                                            cursor: 'pointer',
+                                            padding: 0,
+                                            fontSize: '0.9rem',
+                                            fontFamily: 'inherit'
+                                        }}
+                                    >
+                                        {item.attachment_filename}
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )
+                }
 
                 {/* Items Table */}
-                {request.items && request.items.length > 0 && (
-                    <div style={{ marginTop: '2rem' }}>
-                        <table style={{
-                            width: '100%',
-                            borderCollapse: 'collapse',
-                            fontSize: '0.85rem'
-                        }}>
-                            <thead>
-                                <tr style={{ background: '#1D3557', color: 'white' }}>
-                                    <th style={{
-                                        padding: '0.75rem',
-                                        textAlign: 'left',
-                                        fontWeight: '600',
-                                        fontSize: '0.8rem',
-                                        letterSpacing: '0.5px'
-                                    }}>
-                                        ITEM TYPE
-                                    </th>
-                                    <th style={{
-                                        padding: '0.75rem',
-                                        textAlign: 'right',
-                                        fontWeight: '600',
-                                        fontSize: '0.8rem',
-                                        letterSpacing: '0.5px'
-                                    }}>
-                                        PRICE
-                                    </th>
-                                    <th style={{
-                                        padding: '0.75rem',
-                                        textAlign: 'center',
-                                        fontWeight: '600',
-                                        fontSize: '0.8rem',
-                                        letterSpacing: '0.5px'
-                                    }}>
-                                        QTY
-                                    </th>
-                                    <th style={{
-                                        padding: '0.75rem',
-                                        textAlign: 'right',
-                                        fontWeight: '600',
-                                        fontSize: '0.8rem',
-                                        letterSpacing: '0.5px'
-                                    }}>
-                                        TOTAL
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {request.items.map((item, index) => (
-                                    <tr key={item.id || index} style={{
-                                        borderBottom: '1px solid #DEE2E6',
-                                        background: index % 2 === 0 ? 'white' : '#F8F9FA'
-                                    }}>
-                                        <td style={{ padding: '0.75rem', color: '#495057' }}>
-                                            {item.item_description || 'ITEM NAME'}
-                                        </td>
-                                        <td style={{ padding: '0.75rem', textAlign: 'right', color: '#495057' }}>
-                                            ${item.unit_price?.toFixed(2) || '10.00'}
-                                        </td>
-                                        <td style={{ padding: '0.75rem', textAlign: 'center', color: '#495057' }}>
-                                            {item.quantity || 1}
-                                        </td>
-                                        <td style={{ padding: '0.75rem', textAlign: 'right', color: '#495057', fontWeight: '500' }}>
-                                            ${((item.quantity || 0) * (item.unit_price || 0)).toFixed(2)}
-                                        </td>
+                {
+                    request.items && request.items.length > 0 && (
+                        <div style={{ marginTop: '2rem' }}>
+                            <table style={{
+                                width: '100%',
+                                borderCollapse: 'collapse',
+                                fontSize: '0.85rem'
+                            }}>
+                                <thead>
+                                    <tr style={{ background: '#1D3557', color: 'white' }}>
+                                        <th style={{
+                                            padding: '0.75rem',
+                                            textAlign: 'left',
+                                            fontWeight: '600',
+                                            fontSize: '0.8rem',
+                                            letterSpacing: '0.5px'
+                                        }}>
+                                            ITEM TYPE
+                                        </th>
+                                        <th style={{
+                                            padding: '0.75rem',
+                                            textAlign: 'right',
+                                            fontWeight: '600',
+                                            fontSize: '0.8rem',
+                                            letterSpacing: '0.5px'
+                                        }}>
+                                            PRICE
+                                        </th>
+                                        <th style={{
+                                            padding: '0.75rem',
+                                            textAlign: 'center',
+                                            fontWeight: '600',
+                                            fontSize: '0.8rem',
+                                            letterSpacing: '0.5px'
+                                        }}>
+                                            QTY
+                                        </th>
+                                        <th style={{
+                                            padding: '0.75rem',
+                                            textAlign: 'right',
+                                            fontWeight: '600',
+                                            fontSize: '0.8rem',
+                                            letterSpacing: '0.5px'
+                                        }}>
+                                            TOTAL
+                                        </th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                                </thead>
+                                <tbody>
+                                    {request.items.map((item, index) => (
+                                        <tr key={item.id || index} style={{
+                                            borderBottom: '1px solid #DEE2E6',
+                                            background: index % 2 === 0 ? 'white' : '#F8F9FA'
+                                        }}>
+                                            <td style={{ padding: '0.75rem', color: '#495057' }}>
+                                                {item.item_description || 'ITEM NAME'}
+                                            </td>
+                                            <td style={{ padding: '0.75rem', textAlign: 'right', color: '#495057' }}>
+                                                ${item.unit_price?.toFixed(2) || '10.00'}
+                                            </td>
+                                            <td style={{ padding: '0.75rem', textAlign: 'center', color: '#495057' }}>
+                                                {item.quantity || 1}
+                                            </td>
+                                            <td style={{ padding: '0.75rem', textAlign: 'right', color: '#495057', fontWeight: '500' }}>
+                                                ${((item.quantity || 0) * (item.unit_price || 0)).toFixed(2)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )
+                }
             </div>
 
             {/* FLEET MANAGEMENT SECTION */}
