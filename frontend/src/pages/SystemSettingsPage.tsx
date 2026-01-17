@@ -470,14 +470,31 @@ export const SystemSettingsPage = () => {
             <div className="card" style={{ marginTop: '2rem' }}>
                 <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h2 className="card-title">Database Backups</h2>
-                    <button
-                        onClick={loadBackups}
-                        disabled={loadingBackups}
-                        className="btn btn-outline"
-                        style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
-                    >
-                        {loadingBackups ? 'Refreshing...' : 'Refresh List'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                        <button
+                            onClick={async () => {
+                                if (!token) return;
+                                try {
+                                    const data = await api.getBackupLogs(token);
+                                    alert("Latest Backup Logs:\n\n" + data.logs);
+                                } catch (err) {
+                                    alert("Failed to fetch logs.");
+                                }
+                            }}
+                            className="btn btn-outline"
+                            style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                        >
+                            View Logs
+                        </button>
+                        <button
+                            onClick={loadBackups}
+                            disabled={loadingBackups}
+                            className="btn btn-outline"
+                            style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                        >
+                            {loadingBackups ? 'Refreshing...' : 'Refresh List'}
+                        </button>
+                    </div>
                 </div>
                 <div style={{ padding: '2rem' }}>
                     <p className="text-muted" style={{ marginBottom: '1.5rem' }}>

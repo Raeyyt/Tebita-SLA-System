@@ -317,3 +317,23 @@ async def list_backups(
     # Sort by creation time (newest first)
     backups.sort(key=lambda x: x["created_at"], reverse=True)
     return backups
+@router.get("/backups/logs")
+async def get_backup_logs(
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get the backup debug logs (admin only)"""
+    if current_user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    from ..services.backup_service import DEBUG_LOG
+    
+    if not DEBUG_LOG.exists():
+        return {"logs": "No logs found."}
+        
+    try:
+        with open(DEBUG_LOG, "r") as f:
+            # Return last 100 lines
+            lines = f.readlines()
+            return {"logs": "".join(lines[-100:])}
+    except Exception as e:
+        return {"logs": f"Error reading logs: {str(e)}"}
