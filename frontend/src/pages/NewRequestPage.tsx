@@ -35,11 +35,9 @@ export const NewRequestPage = () => {
     // Request details
     const [description, setDescription] = useState('');
     const [priority, setPriority] = useState<'HIGH' | 'MEDIUM' | 'LOW'>('MEDIUM');
-    const [resourceType, setResourceType] = useState<string>('GENERAL');
+    const [resourceType] = useState<string>('GENERAL');
 
-    const [items, setItems] = useState<RequestItemForm[]>([
-        { item_description: '', quantity: undefined, unit_price: undefined, notes: '', file: undefined }
-    ]);
+    const [items, setItems] = useState<RequestItemForm[]>([]);
     const [requestFiles, setRequestFiles] = useState<File[]>([]);
 
     useEffect(() => {
@@ -460,139 +458,121 @@ export const NewRequestPage = () => {
                         </select>
                     </div>
 
-                    {/* Resource Type */}
-                    <div className="form-group">
-                        <label className="form-label">Resource Type *</label>
-                        <select
-                            className="form-select"
-                            value={resourceType}
-                            onChange={(e) => setResourceType(e.target.value)}
-                            required
-                            style={{ maxWidth: '300px' }}
-                        >
-                            <option value="GENERAL">General Request</option>
-                            <option value="FLEET">Fleet / Transport</option>
-                            <option value="HR">HR Deployment</option>
-                            <option value="FINANCE">Finance Transaction</option>
-                            <option value="ICT">ICT Support</option>
-                            <option value="LOGISTICS">Logistics / Supply</option>
-                        </select>
-                        <small className="text-muted">Select the specific resource area for this request</small>
-                    </div>
+                    {items.length === 0 && (
+                        <div style={{ marginTop: '1rem' }}>
+                            <button type="button" className="btn btn-secondary" onClick={addItem}>
+                                + Add Item
+                            </button>
+                            <p className="text-muted" style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
+                                Click to add specific items, quantities, or individual attachments to this request.
+                            </p>
+                        </div>
+                    )}
                 </div>
 
-                {/* Request Items */}
-                <div className="card">
-                    <div className="card-header">
-                        <h2 className="card-title">Request Items</h2>
-                        <button type="button" className="btn btn-secondary" onClick={addItem}>
-                            + Add Item
-                        </button>
-                    </div>
+                {items.map((item, index) => (
+                    <div key={index} style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--gray-50)', borderRadius: 'var(--radius)' }}>
+                        <div className="flex" style={{ justifyContent: 'space-between', marginBottom: '1rem' }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: '600' }}>Item {index + 1}</h3>
+                            <button
+                                type="button"
+                                onClick={() => removeItem(index)}
+                                className="btn btn-outline"
+                                style={{ color: 'var(--error)', borderColor: 'var(--error)', padding: '0.5rem 1rem' }}
+                            >
+                                Remove
+                            </button>
+                        </div>
 
-                    {items.map((item, index) => (
-                        <div key={index} style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--gray-50)', borderRadius: 'var(--radius)' }}>
-                            <div className="flex" style={{ justifyContent: 'space-between', marginBottom: '1rem' }}>
-                                <h3 style={{ fontSize: '1rem', fontWeight: '600' }}>Item {index + 1}</h3>
-                                {items.length > 1 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => removeItem(index)}
-                                        className="btn btn-outline"
-                                        style={{ color: 'var(--error)', borderColor: 'var(--error)', padding: '0.5rem 1rem' }}
-                                    >
-                                        Remove
-                                    </button>
-                                )}
-                            </div>
-
-                            <div className="grid grid-2">
-                                <div className="form-group">
-                                    <label className="form-label">Item Description</label>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        value={item.item_description}
-                                        onChange={(e) => updateItem(index, 'item_description', e.target.value)}
-                                        placeholder="Describe the item (optional)"
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Item Description File</label>
-                                    <div className="file-input-wrapper">
-                                        <input
-                                            type="file"
-                                            className="file-input-hidden"
-                                            onChange={(e) => handleFileChange(index, e)}
-                                            accept=".doc,.docx,.xls,.xlsx,.pdf,.jpg,.jpeg,.png,.gif"
-                                        />
-                                        <div className="file-input-glass">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                            </svg>
-                                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
-                                                {item.file ? item.file.name : 'Choose File'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <small style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                                        Word, Excel, PDF, or Image
-                                    </small>
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Quantity</label>
-                                    <input
-                                        type="number"
-                                        className="form-input"
-                                        value={item.quantity || ''}
-                                        onChange={(e) => updateItem(index, 'quantity', e.target.value ? Number(e.target.value) : undefined)}
-                                        placeholder="1"
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Unit Price</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        className="form-input"
-                                        value={item.unit_price || ''}
-                                        onChange={(e) => updateItem(index, 'unit_price', e.target.value ? Number(e.target.value) : undefined)}
-                                        placeholder="0.00"
-                                    />
-                                </div>
-                            </div>
-
+                        <div className="grid grid-2">
                             <div className="form-group">
-                                <label className="form-label">Notes</label>
+                                <label className="form-label">Item Description</label>
                                 <input
                                     type="text"
                                     className="form-input"
-                                    value={item.notes || ''}
-                                    onChange={(e) => updateItem(index, 'notes', e.target.value)}
-                                    placeholder="Additional notes for this item"
+                                    value={item.item_description}
+                                    onChange={(e) => updateItem(index, 'item_description', e.target.value)}
+                                    placeholder="Describe the item (optional)"
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Item Description File</label>
+                                <div className="file-input-wrapper">
+                                    <input
+                                        type="file"
+                                        className="file-input-hidden"
+                                        onChange={(e) => handleFileChange(index, e)}
+                                        accept=".doc,.docx,.xls,.xlsx,.pdf,.jpg,.jpeg,.png,.gif"
+                                    />
+                                    <div className="file-input-glass">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                        </svg>
+                                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
+                                            {item.file ? item.file.name : 'Choose File'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <small style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                    Word, Excel, PDF, or Image
+                                </small>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Quantity</label>
+                                <input
+                                    type="number"
+                                    className="form-input"
+                                    value={item.quantity || ''}
+                                    onChange={(e) => updateItem(index, 'quantity', e.target.value ? Number(e.target.value) : undefined)}
+                                    placeholder="1"
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Unit Price</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    className="form-input"
+                                    value={item.unit_price || ''}
+                                    onChange={(e) => updateItem(index, 'unit_price', e.target.value ? Number(e.target.value) : undefined)}
+                                    placeholder="0.00"
                                 />
                             </div>
                         </div>
-                    ))}
-                </div>
 
-                <div className="flex gap-md">
-                    <button type="submit" className="btn btn-primary" disabled={loading}>
-                        {loading ? 'Submitting...' : 'Submit Request'}
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-outline"
-                        onClick={() => navigate('/requests')}
-                        disabled={loading}
-                    >
-                        Cancel
-                    </button>
-                </div>
-            </form>
+                        <div className="form-group">
+                            <label className="form-label">Notes</label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                value={item.notes || ''}
+                                onChange={(e) => updateItem(index, 'notes', e.target.value)}
+                                placeholder="Additional notes for this item"
+                            />
+                        </div>
+                    </div>
+                ))}
         </div>
+    )
+}
+
+<div className="flex gap-md">
+    <button type="submit" className="btn btn-primary" disabled={loading}>
+        {loading ? 'Submitting...' : 'Submit Request'}
+    </button>
+    <button
+        type="button"
+        className="btn btn-outline"
+        onClick={() => navigate('/requests')}
+        disabled={loading}
+    >
+        Cancel
+    </button>
+</div>
+            </form >
+        </div >
     );
 };
