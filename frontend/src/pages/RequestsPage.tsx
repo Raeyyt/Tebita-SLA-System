@@ -49,6 +49,50 @@ export const RequestsPage = () => {
             } else {
                 matchesFilter = false;
             }
+        } else if (filter === 'WITHIN_SLA') {
+            if (!request.created_at) {
+                matchesFilter = false;
+            } else {
+                const created = new Date(request.created_at).getTime();
+                const now = new Date().getTime();
+
+                // Response SLA (Default 2h)
+                const respDeadline = created + (request.sla_response_time_hours || 2) * 60 * 60 * 1000;
+                const actualResp = request.actual_response_time || request.acknowledged_at;
+                // If not acknowledged, use NOW to check if currently breaching
+                const respTime = actualResp ? new Date(actualResp).getTime() : now;
+                const respMet = respTime <= respDeadline;
+
+                // Resolution SLA (Default 24h)
+                const resDeadline = created + (request.sla_completion_time_hours || 24) * 60 * 60 * 1000;
+                const actualRes = request.actual_completion_time || request.completed_at;
+                // If not completed, use NOW to check if currently breaching
+                const resTime = actualRes ? new Date(actualRes).getTime() : now;
+                const resMet = resTime <= resDeadline;
+
+                matchesFilter = respMet && resMet;
+            }
+        } else if (filter === 'MISSED_SLA') {
+            if (!request.created_at) {
+                matchesFilter = false;
+            } else {
+                const created = new Date(request.created_at).getTime();
+                const now = new Date().getTime();
+
+                // Response SLA (Default 2h)
+                const respDeadline = created + (request.sla_response_time_hours || 2) * 60 * 60 * 1000;
+                const actualResp = request.actual_response_time || request.acknowledged_at;
+                const respTime = actualResp ? new Date(actualResp).getTime() : now;
+                const respMet = respTime <= respDeadline;
+
+                // Resolution SLA (Default 24h)
+                const resDeadline = created + (request.sla_completion_time_hours || 24) * 60 * 60 * 1000;
+                const actualRes = request.actual_completion_time || request.completed_at;
+                const resTime = actualRes ? new Date(actualRes).getTime() : now;
+                const resMet = resTime <= resDeadline;
+
+                matchesFilter = !respMet || !resMet;
+            }
         } else {
             matchesFilter = !filter || request.status === filter;
         }
@@ -177,6 +221,20 @@ export const RequestsPage = () => {
                         style={filter === 'OVERDUE' ? { background: 'var(--error)', borderColor: 'var(--error)' } : { color: 'var(--error)', borderColor: 'var(--error)' }}
                     >
                         Overdue
+                    </button>
+                    <button
+                        className={`btn ${filter === 'WITHIN_SLA' ? 'btn-primary' : 'btn-outline'}`}
+                        onClick={() => setFilter('WITHIN_SLA')}
+                        style={filter === 'WITHIN_SLA' ? { background: 'var(--success)', borderColor: 'var(--success)' } : { color: 'var(--success)', borderColor: 'var(--success)' }}
+                    >
+                        Within SLA
+                    </button>
+                    <button
+                        className={`btn ${filter === 'MISSED_SLA' ? 'btn-primary' : 'btn-outline'}`}
+                        onClick={() => setFilter('MISSED_SLA')}
+                        style={filter === 'MISSED_SLA' ? { background: '#c0392b', borderColor: '#c0392b' } : { color: '#c0392b', borderColor: '#c0392b' }}
+                    >
+                        Missed SLA
                     </button>
                 </div>
 
