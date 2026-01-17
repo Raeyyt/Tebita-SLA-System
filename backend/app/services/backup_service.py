@@ -138,45 +138,52 @@ def backup_postgresql() -> Path:
             env["PGPASSWORD"] = password
 
         # Find pg_dump executable
-        pg_dump_cmd = "pg_dump"
-        if os.name == 'nt': # Windows
-            # Check if pg_dump is in PATH
-            import subprocess as sp
-            try:
-                sp.run(["pg_dump", "--version"], capture_output=True, check=True)
-            except (sp.CalledProcessError, FileNotFoundError):
-                # Not in path, try common installation locations
-                log_debug("[Backup] pg_dump not in PATH, searching in Program Files...")
-                pg_base = Path("C:/Program Files/PostgreSQL")
-                if pg_base.exists():
-                    # Find the latest version bin folder
-                    versions = sorted([d for d in pg_base.iterdir() if d.is_dir() and d.name.isdigit()], 
-                                     key=lambda x: int(x.name), reverse=True)
-                    for v in versions:
-                        candidate = v / "bin" / "pg_dump.exe"
-                        if candidate.exists():
-                            pg_dump_cmd = str(candidate)
-                            log_debug(f"[Backup] Found pg_dump at: {pg_dump_cmd}")
-                            break
+        pg_dump_cmd = shutil.which("pg_dump") or "pg_dump"
+        
+        if os.name == 'nt' and pg_dump_cmd == "pg_dump": # Windows fallback
+            # ... (existing Windows discovery logic)
+            log_debug("[Backup] pg_dump not in PATH, searching in Program Files...")
+            pg_base = Path("C:/Program Files/PostgreSQL")
+            if pg_base.exists():
+                versions = sorted([d for d in pg_base.iterdir() if d.is_dir() and d.name.isdigit()], 
+                                 key=lambda x: int(x.name), reverse=True)
+                for v in versions:
+                    candidate = v / "bin" / "pg_dump.exe"
+                    if candidate.exists():
+                        pg_dump_cmd = str(candidate)
+                        log_debug(f"[Backup] Found pg_dump at: {pg_dump_cmd}")
+                        break
+
+        log_debug(f"[Backup] Using pg_dump command: {pg_dump_cmd}")
 
         # Use custom format (-Fc) which is compressed and flexible
         cmd = [
             pg_dump_cmd,
-            "-h", host,
-            "-p", str(port),
             "-U", username,
             "-F", "c",
-            "-f", str(backup_path),
-            dbname
+            "-f", str(backup_path)
         ]
+        
+        # Only add host and port if they are not default/local to allow socket connection on Linux
+        if host and host not in ['localhost', '127.0.0.1']:
+            cmd.extend(["-h", host, "-p", str(port)])
+        elif os.name == 'nt': # Always add host on Windows
+            cmd.extend(["-h", host or "localhost", "-p", str(port)])
+            
+        cmd.append(dbname)
 
-        log_debug(f"[Backup] Running command: {' '.join(cmd[:9])} ... [DBNAME]")
+        log_debug(f"[Backup] Running command: {' '.join([c for c in cmd if 'password' not in c.lower()])}")
+
+        # Ensure directory is writable
+        if not os.access(BACKUP_DIR, os.W_OK):
+            log_debug(f"[Backup] ERROR: Backup directory {BACKUP_DIR} is not writable.")
+            return None
 
         # Run pg_dump
         try:
             result = subprocess.run(cmd, env=env, capture_output=True, text=True)
         except FileNotFoundError:
-            log_debug("[Backup] ERROR: 'pg_dump' utility not found on system path. Please install PostgreSQL client tools.")
+            log_debug(f"[Backup] ERROR: '{pg_dump_cmd}' utility not found.")
             return None
         
         if result.returncode != 0:
