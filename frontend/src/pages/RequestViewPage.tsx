@@ -306,6 +306,16 @@ export const RequestViewPage = () => {
         );
     }
 
+    // DEBUG: Log request structure
+    console.log("=== REQUEST DEBUG ===");
+    console.log("Request ID:", request.request_id);
+    console.log("Items type:", typeof request.items);
+    console.log("Items isArray:", Array.isArray(request.items));
+    console.log("Items value:", request.items);
+    console.log("Attachments type:", typeof request.attachments);
+    console.log("Attachments value:", request.attachments);
+    console.log("====================");
+
 
 
     return (
