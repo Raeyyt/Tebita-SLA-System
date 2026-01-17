@@ -316,6 +316,12 @@ def calculate_realtime_kpis(db: Session, start: datetime, end: datetime, divisio
     completion_rate = (completed / total_requests * 100) if total_requests > 0 else 100
     rejection_rate = (rejected / total_requests * 100) if total_requests > 0 else 0
     
+    # Calculate Average Resolution Time
+    completed_reqs = [r for r in requests if r.status == RequestStatus.COMPLETED and r.completed_at and r.created_at]
+    avg_res_time = 0
+    if completed_reqs:
+        avg_res_time = sum([(r.completed_at - r.created_at).total_seconds() / 3600 for r in completed_reqs]) / len(completed_reqs)
+
     # Return as a list of metrics matching the frontend's expected structure
     return [
         {
@@ -333,11 +339,11 @@ def calculate_realtime_kpis(db: Session, start: datetime, end: datetime, divisio
             "status": "On Track" if rejection_rate <= 5 else "Below Target"
         },
         {
-            "metric_name": "Total Request Volume",
-            "metric_type": "COUNT",
-            "target_value": 10.0,
-            "actual_value": float(total_requests),
-            "status": "On Track" if total_requests >= 10 else "Below Target"
+            "metric_name": "Avg. Resolution Time",
+            "metric_type": "HOURS",
+            "target_value": 24.0,
+            "actual_value": round(avg_res_time, 1),
+            "status": "On Track" if avg_res_time <= 24 else "Below Target"
         }
     ]
 
