@@ -80,13 +80,13 @@ export const SLAMonitorPage = () => {
                             <div className="text-small text-muted">Total Requests</div>
                             <div style={{ fontSize: '2rem', fontWeight: '700' }}>{compliance.total_requests}</div>
                         </div>
-                        <div className="clickable" onClick={() => navigate('/requests', { state: { filter: 'COMPLETED' } })} style={{ cursor: 'pointer', padding: '1rem', borderRadius: 'var(--radius)', transition: 'background 0.2s' }}>
+                        <div className="clickable" onClick={() => navigate('/requests', { state: { filter: 'WITHIN_SLA' } })} style={{ cursor: 'pointer', padding: '1rem', borderRadius: 'var(--radius)', transition: 'background 0.2s' }}>
                             <div className="text-small text-muted">Within SLA</div>
                             <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--success)' }}>
                                 {compliance.within_sla}
                             </div>
                         </div>
-                        <div className="clickable" onClick={() => navigate('/requests', { state: { filter: 'COMPLETED' } })} style={{ cursor: 'pointer', padding: '1rem', borderRadius: 'var(--radius)', transition: 'background 0.2s' }}>
+                        <div className="clickable" onClick={() => navigate('/requests', { state: { filter: 'MISSED_SLA' } })} style={{ cursor: 'pointer', padding: '1rem', borderRadius: 'var(--radius)', transition: 'background 0.2s' }}>
                             <div className="text-small text-muted">Missed SLA</div>
                             <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--error)' }}>
                                 {compliance.overdue}
