@@ -184,7 +184,7 @@ export const KPIsPage = () => {
                                                 <td style={{ padding: '1rem', color: '#6b7280' }}>{metric.target_value}</td>
                                                 <td style={{ padding: '1rem', fontWeight: 500, color: '#111827' }}>{metric.actual_value}</td>
                                                 <td style={{ padding: '1rem' }}>
-                                                    {metric.actual_value >= metric.target_value ? (
+                                                    {metric.status === "On Track" ? (
                                                         <span style={{
                                                             background: '#d1fae5',
                                                             color: '#065f46',
