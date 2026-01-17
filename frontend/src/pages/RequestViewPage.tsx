@@ -713,13 +713,13 @@ export const RequestViewPage = () => {
                                                 {item.item_description || 'ITEM NAME'}
                                             </td>
                                             <td style={{ padding: '0.75rem', textAlign: 'right', color: '#495057' }}>
-                                                ${item.unit_price?.toFixed(2) || '10.00'}
+                                                ${item.unit_price ? Number(item.unit_price).toFixed(2) : '10.00'}
                                             </td>
                                             <td style={{ padding: '0.75rem', textAlign: 'center', color: '#495057' }}>
                                                 {item.quantity || 1}
                                             </td>
                                             <td style={{ padding: '0.75rem', textAlign: 'right', color: '#495057', fontWeight: '500' }}>
-                                                ${((item.quantity || 0) * (item.unit_price || 0)).toFixed(2)}
+                                                ${((Number(item.quantity) || 0) * (Number(item.unit_price) || 0)).toFixed(2)}
                                             </td>
                                         </tr>
                                     ))}
