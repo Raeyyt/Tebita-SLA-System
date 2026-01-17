@@ -22,6 +22,47 @@ router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 
 # ============================================================================
+# DASHBOARD ENDPOINT
+# ============================================================================
+
+@router.get("/dashboard")
+async def get_analytics_dashboard(
+    division_id: Optional[int] = None,
+    department_id: Optional[int] = None,
+    days: int = Query(30, description="Number of days to analyze"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get analytics dashboard with integration index and general KPIs"""
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+    
+    # Calculate integration index
+    integration_data = calculate_integration_index(
+        db, division_id, department_id, start_date, end_date
+    )
+    
+    # Calculate general KPIs
+    general_kpis = {
+        "sla_compliance_rate": calculate_sla_compliance_rate(
+            db, division_id, department_id, start_date, end_date
+        ),
+        "service_fulfillment_rate": calculate_service_request_fulfillment_rate(
+            db, division_id, start_date, end_date
+        ),
+        "customer_satisfaction_score": calculate_customer_satisfaction_score(
+            db, division_id, start_date, end_date
+        )
+    }
+    
+    return {
+        "integration_index": integration_data.get("overall_index", 0),
+        "components": integration_data.get("components", {}),
+        "general_kpis": general_kpis
+    }
+
+
+# ============================================================================
 # GENERAL INTEGRATION KPIs
 # ============================================================================
 
