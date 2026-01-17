@@ -148,11 +148,22 @@ def backup_postgresql() -> Path:
             dbname
         ]
 
+        log_debug(f"[Backup] Running command: {' '.join(cmd[:9])} ... [DBNAME]")
+
         # Run pg_dump
-        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        try:
+            result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        except FileNotFoundError:
+            log_debug("[Backup] ERROR: 'pg_dump' utility not found on system path. Please install PostgreSQL client tools.")
+            return None
         
         if result.returncode != 0:
-            log_debug(f"[Backup] ERROR: pg_dump failed - {result.stderr}")
+            log_debug(f"[Backup] ERROR: pg_dump failed with exit code {result.returncode}")
+            log_debug(f"[Backup] Stderr: {result.stderr}")
+            return None
+
+        if not backup_path.exists():
+            log_debug("[Backup] ERROR: Backup file was not created despite pg_dump success.")
             return None
 
         file_size = backup_path.stat().st_size / 1024  # Size in KB
@@ -162,7 +173,9 @@ def backup_postgresql() -> Path:
         return backup_path
         
     except Exception as e:
+        import traceback
         log_debug(f"[Backup] ERROR: PostgreSQL backup failed - {e}")
+        log_debug(traceback.format_exc())
         return None
 
 

@@ -38,6 +38,8 @@ services:
     depends_on:
       - postgres
       - redis
+    volumes:
+      - ./backend/backups:/app/backups
     networks:
       - app-network
 
