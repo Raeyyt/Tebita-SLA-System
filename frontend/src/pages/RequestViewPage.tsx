@@ -623,7 +623,6 @@ export const RequestViewPage = () => {
                                     fontSize: '0.9rem',
                                     color: '#495057'
                                 }}>
-                                    <span style={{ fontSize: '1.2rem' }}></span>
                                     <button
                                         onClick={async () => {
                                             if (token && item.attachment_filename) {
@@ -636,18 +635,28 @@ export const RequestViewPage = () => {
                                             }
                                         }}
                                         style={{
-                                            background: 'none',
+                                            background: '#3498db',
+                                            color: 'white',
                                             border: 'none',
-                                            color: '#3498db',
-                                            textDecoration: 'underline',
+                                            borderRadius: '4px',
+                                            padding: '0.4rem 0.8rem',
+                                            fontSize: '0.85rem',
+                                            fontWeight: '500',
                                             cursor: 'pointer',
-                                            padding: 0,
-                                            fontSize: '0.9rem',
-                                            fontFamily: 'inherit'
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.5rem',
+                                            transition: 'background-color 0.2s'
                                         }}
+                                        onMouseOver={(e) => e.currentTarget.style.background = '#2980b9'}
+                                        onMouseOut={(e) => e.currentTarget.style.background = '#3498db'}
+                                        title={item.attachment_filename}
                                     >
-                                        {item.attachment_filename}
+                                        View Item File
                                     </button>
+                                    <span style={{ fontSize: '0.8rem', color: '#6c757d' }}>
+                                        {item.attachment_filename}
+                                    </span>
                                 </div>
                             ))}
                         </div>
@@ -670,7 +679,8 @@ export const RequestViewPage = () => {
                                             textAlign: 'left',
                                             fontWeight: '600',
                                             fontSize: '0.8rem',
-                                            letterSpacing: '0.5px'
+                                            letterSpacing: '0.5px',
+                                            color: 'white'
                                         }}>
                                             ITEM TYPE
                                         </th>
@@ -679,7 +689,8 @@ export const RequestViewPage = () => {
                                             textAlign: 'right',
                                             fontWeight: '600',
                                             fontSize: '0.8rem',
-                                            letterSpacing: '0.5px'
+                                            letterSpacing: '0.5px',
+                                            color: 'white'
                                         }}>
                                             PRICE
                                         </th>
@@ -688,7 +699,8 @@ export const RequestViewPage = () => {
                                             textAlign: 'center',
                                             fontWeight: '600',
                                             fontSize: '0.8rem',
-                                            letterSpacing: '0.5px'
+                                            letterSpacing: '0.5px',
+                                            color: 'white'
                                         }}>
                                             QTY
                                         </th>
@@ -697,7 +709,8 @@ export const RequestViewPage = () => {
                                             textAlign: 'right',
                                             fontWeight: '600',
                                             fontSize: '0.8rem',
-                                            letterSpacing: '0.5px'
+                                            letterSpacing: '0.5px',
+                                            color: 'white'
                                         }}>
                                             TOTAL
                                         </th>
