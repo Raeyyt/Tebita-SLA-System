@@ -576,7 +576,7 @@ export const RequestViewPage = () => {
 
                 {/* Item Description (if single item) */}
                 {
-                    request.items && request.items.length === 1 && (
+                    Array.isArray(request.items) && request.items.length === 1 && (
                         <div style={{ marginBottom: '1.5rem' }}>
                             <h3 style={{
                                 fontSize: '0.95rem',
@@ -595,7 +595,7 @@ export const RequestViewPage = () => {
 
                 {/* Item Description File */}
                 {
-                    request.items && request.items.some(item => item.attachment_filename) && (
+                    Array.isArray(request.items) && request.items.some(item => item?.attachment_filename) && (
                         <div style={{ marginBottom: '1.5rem' }}>
                             <h3 style={{
                                 fontSize: '0.95rem',
@@ -605,7 +605,7 @@ export const RequestViewPage = () => {
                             }}>
                                 ITEM DESCRIPTION FILE
                             </h3>
-                            {request.items.filter(item => item.attachment_filename).map((item, idx) => (
+                            {request.items.filter(item => item?.attachment_filename).map((item, idx) => (
                                 <div key={idx} style={{
                                     display: 'flex',
                                     alignItems: 'center',
@@ -646,7 +646,7 @@ export const RequestViewPage = () => {
 
                 {/* Items Table */}
                 {
-                    request.items && request.items.length > 0 && (
+                    Array.isArray(request.items) && request.items.length > 0 && (
                         <div style={{ marginTop: '2rem' }}>
                             <table style={{
                                 width: '100%',
