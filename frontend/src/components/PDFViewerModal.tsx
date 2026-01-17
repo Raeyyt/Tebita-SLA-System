@@ -25,7 +25,7 @@ export const PDFViewerModal = ({ requestId, requestNumber, isOpen, onClose }: PD
             setError(null);
             try {
                 const apiBase = getApiUrl();
-                const response = await fetch(`${apiBase}/api/requests/${requestId}/pdf`, {
+                const response = await fetch(`${apiBase}/requests/${requestId}/pdf`, {
                     headers: {
                         Authorization: `Bearer ${token}`,
                     },
