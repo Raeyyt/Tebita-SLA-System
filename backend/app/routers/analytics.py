@@ -56,7 +56,7 @@ async def get_analytics_dashboard(
     }
     
     return {
-        "integration_index": integration_data.get("overall_index", 0),
+        "integration_index": integration_data.get("integration_index", 0),
         "components": integration_data.get("components", {}),
         "general_kpis": general_kpis
     }

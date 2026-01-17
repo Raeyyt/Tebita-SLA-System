@@ -298,7 +298,7 @@ async def get_kpi_dashboard(
 
 
 def calculate_realtime_kpis(db: Session, start: datetime, end: datetime, division_id: int = None, department_id: int = None):
-    """Calculate KPIs in real-time"""
+    """Calculate KPIs in real-time and return as a list of metric objects"""
     
     query = db.query(Request).filter(Request.created_at >= start, Request.created_at <= end)
     
@@ -309,19 +309,37 @@ def calculate_realtime_kpis(db: Session, start: datetime, end: datetime, divisio
     
     requests = query.all()
     
-    # Calculate various KPIs
     total_requests = len(requests)
     completed = len([r for r in requests if r.status == RequestStatus.COMPLETED])
-    pending = len([r for r in requests if r.status == RequestStatus.PENDING])
+    rejected = len([r for r in requests if r.status == RequestStatus.REJECTED])
     
-    completion_rate = (completed / total_requests * 100) if total_requests > 0 else 0
+    completion_rate = (completed / total_requests * 100) if total_requests > 0 else 100
+    rejection_rate = (rejected / total_requests * 100) if total_requests > 0 else 0
     
-    return {
-        "total_requests": total_requests,
-        "completed_requests": completed,
-        "pending_requests": pending,
-        "completion_rate": round(completion_rate, 2),
-    }
+    # Return as a list of metrics matching the frontend's expected structure
+    return [
+        {
+            "metric_name": "Service Fulfillment Rate",
+            "metric_type": "PERCENTAGE",
+            "target_value": 95.0,
+            "actual_value": round(completion_rate, 2),
+            "status": "On Track" if completion_rate >= 95 else "Below Target"
+        },
+        {
+            "metric_name": "Request Rejection Rate",
+            "metric_type": "PERCENTAGE",
+            "target_value": 5.0,
+            "actual_value": round(rejection_rate, 2),
+            "status": "On Track" if rejection_rate <= 5 else "Below Target"
+        },
+        {
+            "metric_name": "Total Request Volume",
+            "metric_type": "COUNT",
+            "target_value": 10.0,
+            "actual_value": float(total_requests),
+            "status": "On Track" if total_requests >= 10 else "Below Target"
+        }
+    ]
 
 
 def calculate_scorecard(db: Session, start: datetime, end: datetime, division_id: int = None, department_id: int = None):

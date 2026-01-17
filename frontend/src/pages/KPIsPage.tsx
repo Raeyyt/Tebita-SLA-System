@@ -59,6 +59,12 @@ export const KPIsPage = () => {
                 console.error('Analytics error:', err);
             } finally {
                 setLoading(false);
+                // DEBUG: Log data structures
+                console.log("=== KPI DATA DEBUG ===");
+                console.log("Scorecard:", scorecard);
+                console.log("Analytics:", analytics);
+                console.log("Metrics:", metrics);
+                console.log("======================");
             }
         };
 
