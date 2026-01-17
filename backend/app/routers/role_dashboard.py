@@ -27,7 +27,8 @@ async def get_admin_dashboard(
         func.count(Request.id).label("total"),
         func.count(case((Request.status == RequestStatus.PENDING, 1))).label("pending"),
         func.count(case((Request.status == RequestStatus.IN_PROGRESS, 1))).label("in_progress"),
-        func.count(case((Request.status == RequestStatus.COMPLETED, 1))).label("completed")
+        func.count(case((Request.status == RequestStatus.COMPLETED, 1))).label("completed"),
+        func.count(case((Request.status == RequestStatus.REJECTED, 1))).label("rejected")
     ).one()
     
     # 2. Division breakdown in one query
@@ -64,7 +65,8 @@ async def get_admin_dashboard(
             "total_requests": stats.total or 0,
             "pending": stats.pending or 0,
             "in_progress": stats.in_progress or 0,
-            "completed": stats.completed or 0
+            "completed": stats.completed or 0,
+            "rejected": stats.rejected or 0
         },
         "divisions": division_stats,
         "departments": dept_stats,
@@ -104,7 +106,8 @@ async def get_division_dashboard(
         func.count(Request.id).label("total"),
         func.count(case((Request.status == RequestStatus.PENDING, 1))).label("pending"),
         func.count(case((Request.status == RequestStatus.IN_PROGRESS, 1))).label("in_progress"),
-        func.count(case((Request.status == RequestStatus.COMPLETED, 1))).label("completed")
+        func.count(case((Request.status == RequestStatus.COMPLETED, 1))).label("completed"),
+        func.count(case((Request.status == RequestStatus.REJECTED, 1))).label("rejected")
     ).filter(Request.assigned_division_id == current_user.division_id).one()
     
     # 2. Department breakdown within division in one query
@@ -132,7 +135,8 @@ async def get_division_dashboard(
             "total_requests": stats.total or 0,
             "pending": stats.pending or 0,
             "in_progress": stats.in_progress or 0,
-            "completed": stats.completed or 0
+            "completed": stats.completed or 0,
+            "rejected": stats.rejected or 0
         },
         "departments": dept_stats
     }
@@ -162,7 +166,8 @@ async def get_department_dashboard(
         func.count(Request.id).label("total"),
         func.count(case((Request.status == RequestStatus.PENDING, 1))).label("pending"),
         func.count(case((Request.status == RequestStatus.IN_PROGRESS, 1))).label("in_progress"),
-        func.count(case((Request.status == RequestStatus.COMPLETED, 1))).label("completed")
+        func.count(case((Request.status == RequestStatus.COMPLETED, 1))).label("completed"),
+        func.count(case((Request.status == RequestStatus.REJECTED, 1))).label("rejected")
     ).filter(Request.assigned_department_id == current_user.department_id).one()
     
     # 2. Sub-department breakdown in one query
@@ -190,7 +195,8 @@ async def get_department_dashboard(
             "total_requests": stats.total or 0,
             "pending": stats.pending or 0,
             "in_progress": stats.in_progress or 0,
-            "completed": stats.completed or 0
+            "completed": stats.completed or 0,
+            "rejected": stats.rejected or 0
         },
         "subdepartments": subdept_stats
     }

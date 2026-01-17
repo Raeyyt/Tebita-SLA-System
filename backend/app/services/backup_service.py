@@ -44,16 +44,32 @@ def backup_sqlite() -> Path:
     """Backup SQLite database."""
     try:
         # Extract database path from URL (sqlite:///./tebita.db -> tebita.db)
-        db_path = settings.database_url.replace("sqlite:///", "").lstrip("./")
+        db_url = settings.database_url
+        db_path_str = db_url.replace("sqlite:///", "")
         
-        if not os.path.exists(db_path):
-            print(f"[Backup] ERROR: SQLite database not found: {db_path}")
+        # Handle Windows paths and relative paths
+        db_path = Path(db_path_str)
+        
+        # If not found, try common locations
+        if not db_path.exists():
+            # Try relative to backend directory if we are in root
+            alt_path = Path("backend") / db_path_str.lstrip("./")
+            if alt_path.exists():
+                db_path = alt_path
+            else:
+                # Try relative to current directory without ./
+                alt_path = Path(db_path_str.lstrip("./"))
+                if alt_path.exists():
+                    db_path = alt_path
+        
+        if not db_path.exists():
+            print(f"[Backup] ERROR: SQLite database not found at {db_path} or common alternatives.")
             return None
         
         backup_path = BACKUP_DIR / get_backup_filename()
-        shutil.copy2(db_path, backup_path)
+        shutil.copy2(str(db_path), str(backup_path))
         
-        file_size =backup_path.stat().st_size / 1024  # Size in KB
+        file_size = backup_path.stat().st_size / 1024  # Size in KB
         print(f"[Backup] SUCCESS: SQLite backup created - {backup_path.name} ({file_size:.2f} KB)")
         
         cleanup_old_backups()

@@ -15,6 +15,7 @@ interface DivisionDashboardData {
         pending: number;
         in_progress: number;
         completed: number;
+        rejected: number;
     };
     departments: Array<{
         id: number;
@@ -57,7 +58,7 @@ export const DivisionDashboardPage = () => {
             </div>
 
             {/* Summary Stats */}
-            <div className="grid grid-4" style={{ marginBottom: '2rem' }}>
+            <div className="grid grid-5" style={{ marginBottom: '2rem' }}>
                 <div className="card">
                     <div style={{ padding: '1.5rem', textAlign: 'center' }}>
                         <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--primary)' }}>
@@ -88,6 +89,14 @@ export const DivisionDashboardPage = () => {
                             {data?.summary?.completed ?? 0}
                         </div>
                         <p className="text-muted">Completed</p>
+                    </div>
+                </div>
+                <div className="card">
+                    <div style={{ padding: '1.5rem', textAlign: 'center' }}>
+                        <div style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--error)' }}>
+                            {data?.summary?.rejected ?? 0}
+                        </div>
+                        <p className="text-muted">Rejected</p>
                     </div>
                 </div>
             </div>

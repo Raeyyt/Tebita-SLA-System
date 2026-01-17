@@ -513,4 +513,12 @@ export const api = {
         const response = await client.delete('/settings/reset-data', withAuth(token));
         return response.data;
     },
+
+    downloadBackup: async (token: string, filename: string) => {
+        const response = await client.get(`/settings/backups/download/${filename}`, {
+            ...withAuth(token),
+            responseType: 'blob',
+        });
+        return response.data;
+    },
 };

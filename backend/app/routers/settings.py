@@ -226,7 +226,8 @@ async def reset_system_data(
         # 0. Create Safety Backup
         from ..services.backup_service import create_database_backup
         backup_path = create_database_backup()
-        backup_msg = f"Safety backup created at {backup_path.name}" if backup_path else "Backup failed, but reset proceeded."
+        backup_filename = backup_path.name if backup_path else None
+        backup_msg = f"Safety backup created: {backup_filename}" if backup_filename else "Backup failed, but reset proceeded."
 
         # 1. Delete Resource-Specific Details (Child tables)
         from ..models import (
@@ -257,7 +258,8 @@ async def reset_system_data(
         
         return {
             "success": True, 
-            "message": f"System reset successful. {num_deleted} requests removed. {backup_msg}"
+            "message": f"System reset successful. {num_deleted} requests removed. {backup_msg}",
+            "backup_filename": backup_filename
         }
         
     except Exception as e:
@@ -266,3 +268,26 @@ async def reset_system_data(
             status_code=500, 
             detail=f"Failed to reset system data: {str(e)}"
         )
+
+@router.get("/backups/download/{filename}")
+async def download_backup(
+    filename: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Download a specific database backup file (admin only)"""
+    if current_user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    from fastapi.responses import FileResponse
+    from ..services.backup_service import BACKUP_DIR
+    
+    file_path = BACKUP_DIR / filename
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Backup file not found")
+    
+    return FileResponse(
+        path=file_path,
+        filename=filename,
+        media_type='application/octet-stream'
+    )

@@ -21,6 +21,7 @@ export const SystemSettingsPage = () => {
     // Health Check State
     const [healthStatus, setHealthStatus] = useState<any>(null);
     const [testingSystem, setTestingSystem] = useState(false);
+    const [backupFilename, setBackupFilename] = useState<string | null>(null);
 
     useEffect(() => {
         const loadSettings = async () => {
@@ -128,16 +129,37 @@ export const SystemSettingsPage = () => {
         if (!token) return;
 
         setSaving(true);
+        setBackupFilename(null);
         try {
             const result = await api.resetSystemData(token);
             alert(result.message || 'System data reset successfully.');
-            // Reload page to reflect changes (optional, but good practice)
-            window.location.reload();
+            if (result.backup_filename) {
+                setBackupFilename(result.backup_filename);
+            }
         } catch (err) {
             console.error('Failed to reset system data:', err);
             alert('Failed to reset system data. Check console for details.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleDownloadBackup = async () => {
+        if (!token || !backupFilename) return;
+
+        try {
+            const blob = await api.downloadBackup(token, backupFilename);
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', backupFilename);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode?.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Failed to download backup:', err);
+            alert('Failed to download backup file.');
         }
     };
 
@@ -458,6 +480,41 @@ export const SystemSettingsPage = () => {
                             Reset Data
                         </button>
                     </div>
+
+                    {backupFilename && (
+                        <div style={{
+                            marginTop: '2rem',
+                            padding: '1.5rem',
+                            background: '#f0f9ff',
+                            border: '1px solid #bae6fd',
+                            borderRadius: '8px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                        }}>
+                            <div>
+                                <h4 style={{ margin: '0 0 0.5rem 0', color: '#0369a1' }}>Backup Ready</h4>
+                                <p style={{ margin: 0, fontSize: '0.9rem', color: '#0c4a6e' }}>
+                                    A safety backup was created before the reset: <strong>{backupFilename}</strong>
+                                </p>
+                            </div>
+                            <div style={{ display: 'flex', gap: '1rem' }}>
+                                <button
+                                    onClick={handleDownloadBackup}
+                                    className="btn btn-primary"
+                                    style={{ background: '#0284c7' }}
+                                >
+                                    Download SQL Backup
+                                </button>
+                                <button
+                                    onClick={() => window.location.reload()}
+                                    className="btn btn-outline"
+                                >
+                                    Refresh Page
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 

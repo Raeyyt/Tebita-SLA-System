@@ -10,6 +10,7 @@ interface AdminDashboardData {
         pending: number;
         in_progress: number;
         completed: number;
+        rejected: number;
     };
     divisions: Array<{
         id: number;
@@ -142,7 +143,7 @@ export const AdminDashboardPage = () => {
             )}
 
             {/* System-Wide Summary */}
-            <div className="grid grid-4" style={{ marginBottom: '2rem' }}>
+            <div className="grid grid-5" style={{ marginBottom: '2rem' }}>
                 <div className="card">
                     <div style={{ padding: '1.5rem', textAlign: 'center' }}>
                         <div style={{ fontSize: '2.5rem', fontWeight: '700', color: 'var(--primary)' }}>
@@ -173,6 +174,14 @@ export const AdminDashboardPage = () => {
                             {data?.summary?.completed ?? 0}
                         </div>
                         <p className="text-muted">Completed</p>
+                    </div>
+                </div>
+                <div className="card">
+                    <div style={{ padding: '1.5rem', textAlign: 'center' }}>
+                        <div style={{ fontSize: '2.5rem', fontWeight: '700', color: 'var(--error)' }}>
+                            {data?.summary?.rejected ?? 0}
+                        </div>
+                        <p className="text-muted">Rejected</p>
                     </div>
                 </div>
             </div>
