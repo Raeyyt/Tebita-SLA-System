@@ -140,15 +140,23 @@ def backup_postgresql() -> Path:
         # Find pg_dump executable
         pg_dump_cmd = shutil.which("pg_dump") or "pg_dump"
         
-        if os.name == 'nt' and pg_dump_cmd == "pg_dump": # Windows fallback
-            # ... (existing Windows discovery logic)
-            log_debug("[Backup] pg_dump not in PATH, searching in Program Files...")
-            pg_base = Path("C:/Program Files/PostgreSQL")
-            if pg_base.exists():
-                versions = sorted([d for d in pg_base.iterdir() if d.is_dir() and d.name.isdigit()], 
-                                 key=lambda x: int(x.name), reverse=True)
-                for v in versions:
-                    candidate = v / "bin" / "pg_dump.exe"
+        if pg_dump_cmd == "pg_dump":
+            if os.name == 'nt': # Windows fallback
+                log_debug("[Backup] pg_dump not in PATH, searching in Program Files...")
+                pg_base = Path("C:/Program Files/PostgreSQL")
+                if pg_base.exists():
+                    versions = sorted([d for d in pg_base.iterdir() if d.is_dir() and d.name.isdigit()], 
+                                     key=lambda x: int(x.name), reverse=True)
+                    for v in versions:
+                        candidate = v / "bin" / "pg_dump.exe"
+                        if candidate.exists():
+                            pg_dump_cmd = str(candidate)
+                            log_debug(f"[Backup] Found pg_dump at: {pg_dump_cmd}")
+                            break
+            else: # Linux fallback
+                log_debug("[Backup] pg_dump not in PATH, searching in common Linux paths...")
+                for path in ["/usr/bin/pg_dump", "/usr/local/bin/pg_dump"]:
+                    candidate = Path(path)
                     if candidate.exists():
                         pg_dump_cmd = str(candidate)
                         log_debug(f"[Backup] Found pg_dump at: {pg_dump_cmd}")
