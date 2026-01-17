@@ -506,6 +506,7 @@ export const SystemSettingsPage = () => {
                                             <td style={{ padding: '1rem', textAlign: 'right' }}>
                                                 <button
                                                     onClick={async () => {
+                                                        if (!token || !backup.filename) return;
                                                         try {
                                                             const blob = await api.downloadBackup(token, backup.filename);
                                                             const url = window.URL.createObjectURL(blob);
