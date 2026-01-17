@@ -64,6 +64,12 @@ def calculate_kpi_metrics(db: Session, department_id: int = None, division_id: i
         *filters,
         or_(
             Request.status == RequestStatus.COMPLETED,
+            # Response overdue (if not yet acknowledged)
+            and_(
+                Request.acknowledged_at.is_(None),
+                extract('epoch', func.now()) > extract('epoch', Request.created_at) + (func.coalesce(Request.sla_response_time_hours, 2) * 3600)
+            ),
+            # Resolution overdue
             and_(
                 Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVAL_PENDING, RequestStatus.APPROVED]),
                 extract('epoch', func.now()) > extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
@@ -110,6 +116,12 @@ def calculate_sla_compliance_rate(db: Session, division_id: int = None, departme
     total_query = db.query(func.count(Request.id)).filter(
         or_(
             Request.status == RequestStatus.COMPLETED,
+            # Response overdue (if not yet acknowledged)
+            and_(
+                Request.acknowledged_at.is_(None),
+                extract('epoch', func.now()) > extract('epoch', Request.created_at) + (func.coalesce(Request.sla_response_time_hours, 2) * 3600)
+            ),
+            # Resolution overdue
             and_(
                 Request.status.in_([RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.APPROVAL_PENDING, RequestStatus.APPROVED]),
                 extract('epoch', func.now()) > extract('epoch', Request.created_at) + (func.coalesce(Request.sla_completion_time_hours, 24) * 3600)
