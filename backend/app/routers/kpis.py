@@ -450,10 +450,10 @@ def calculate_scorecard(db: Session, start: datetime, end: datetime, division_id
         rating = ScoreRating.UNSATISFACTORY
     
     return {
-        'service_efficiency': Decimal(str(round(service_efficiency, 2))),
-        'compliance': Decimal(str(round(compliance, 2))),
-        'cost_optimization': Decimal(str(cost_optimization)),
-        'satisfaction': Decimal(str(satisfaction)),
-        'total': total,
+        'service_efficiency_score': Decimal(str(round(service_efficiency, 2))),
+        'compliance_score': Decimal(str(round(compliance, 2))),
+        'cost_optimization_score': Decimal(str(cost_optimization)),
+        'satisfaction_score': Decimal(str(satisfaction)),
+        'total_score': total,
         'rating': rating,
     }
