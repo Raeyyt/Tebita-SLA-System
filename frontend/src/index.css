@@ -620,6 +620,10 @@ tr:hover {
   grid-template-columns: repeat(4, 1fr);
 }
 
+.grid-5 {
+  grid-template-columns: repeat(5, 1fr);
+}
+
 /* Login Page */
 .auth-container {
   min-height: 100vh;
@@ -1039,6 +1043,10 @@ tr:hover {
   .grid-4 {
     grid-template-columns: repeat(2, 1fr);
   }
+
+  .grid-5 {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 /* Mobile phones */
@@ -1176,7 +1184,8 @@ tr:hover {
   /* Grids - Single column */
   .grid-2,
   .grid-3,
-  .grid-4 {
+  .grid-4,
+  .grid-5 {
     grid-template-columns: 1fr !important;
     gap: 0.75rem !important;
   }
