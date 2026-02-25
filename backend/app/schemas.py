@@ -46,6 +46,13 @@ class UserUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 
+class UserMeUpdate(BaseModel):
+    username: Optional[str] = None
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None
+
+
 class UserRead(UserBase):
     id: int
     role: UserRole

@@ -20,6 +20,7 @@ import { DepartmentDashboardPage } from './pages/DepartmentDashboardPage';
 import { StaffDashboardPage } from './pages/StaffDashboardPage';
 import { DepartmentRatingsPage } from './pages/DepartmentRatingsPage';
 import { SystemSettingsPage } from './pages/SystemSettingsPage';
+import { AccountSettingsPage } from './pages/AccountSettingsPage';
 import VisualAnalyticsPage from './pages/VisualAnalyticsPage';
 import './index.css';
 
@@ -57,6 +58,7 @@ function App() {
             <Route path="visual-analytics" element={<VisualAnalyticsPage />} />  {/* Visual Analytics Dashboard */}
             <Route path="ratings" element={<DepartmentRatingsPage />} />  {/* Department Ratings Analytics */}
             <Route path="settings" element={<SystemSettingsPage />} />  {/* System Settings */}
+            <Route path="settings/account" element={<AccountSettingsPage />} />
             <Route path="admin/users" element={<UserManagement />} />
             <Route path="reports" element={<div className="card"><h2>Reports - Coming Soon</h2></div>} />
           </Route>

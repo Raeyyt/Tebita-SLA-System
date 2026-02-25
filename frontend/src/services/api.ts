@@ -324,6 +324,11 @@ export const api = {
         return response.data;
     },
 
+    updateMe: async (token: string, data: any) => {
+        const response = await client.put('/users/me', data, withAuth(token));
+        return response.data;
+    },
+
     // Request actions
 
     // Resource Management (Phase 2)
