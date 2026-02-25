@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 
 export const AccountSettingsPage = () => {
-    const { user, token, logout } = useAuth();
-    const navigate = useNavigate();
+    const { user, token } = useAuth();
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -46,15 +44,9 @@ export const AccountSettingsPage = () => {
             if (!token) throw new Error("No auth token");
             await api.updateMe(token, updateData);
 
-            if (formData.password || formData.username !== user?.username) {
-                setSuccess("Account updated successfully! You will be redirected to login in 3 seconds...");
-                setTimeout(() => {
-                    logout();
-                    navigate('/login');
-                }, 3000);
-            } else {
-                setSuccess("Account updated successfully!");
-            }
+            setSuccess("✅ Updated Successfully!");
+            // Clear password fields after successful update
+            setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
         } catch (err: any) {
             setError(err.response?.data?.detail || "Failed to update account");
         } finally {
@@ -68,8 +60,35 @@ export const AccountSettingsPage = () => {
 
             <div className="card" style={{ padding: '2rem', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(10px)' }}>
                 <form onSubmit={handleSubmit}>
-                    {success && <div className="alert alert-success" style={{ marginBottom: '1.5rem' }}>{success}</div>}
-                    {error && <div className="alert alert-danger" style={{ marginBottom: '1.5rem' }}>{error}</div>}
+                    {success && (
+                        <div style={{
+                            marginBottom: '1.5rem',
+                            padding: '1rem',
+                            borderRadius: '8px',
+                            background: 'rgba(34, 197, 94, 0.15)',
+                            border: '1px solid rgba(34, 197, 94, 0.3)',
+                            color: '#22c55e',
+                            fontWeight: '600',
+                            textAlign: 'center',
+                            fontSize: '1.1rem'
+                        }}>
+                            {success}
+                        </div>
+                    )}
+                    {error && (
+                        <div style={{
+                            marginBottom: '1.5rem',
+                            padding: '1rem',
+                            borderRadius: '8px',
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            color: '#ef4444',
+                            fontWeight: '600',
+                            textAlign: 'center'
+                        }}>
+                            {error}
+                        </div>
+                    )}
 
                     <div className="form-group" style={{ marginBottom: '1.5rem' }}>
                         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Username</label>
