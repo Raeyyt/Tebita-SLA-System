@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/api';
 
 export const AccountSettingsPage = () => {
     const { user, token, logout } = useAuth();
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -44,11 +46,14 @@ export const AccountSettingsPage = () => {
             if (!token) throw new Error("No auth token");
             await api.updateMe(token, updateData);
 
-            setSuccess("Account updated successfully! Please log in again to apply changes if you updated your username or password.");
             if (formData.password || formData.username !== user?.username) {
+                setSuccess("Account updated successfully! You will be redirected to login in 3 seconds...");
                 setTimeout(() => {
                     logout();
+                    navigate('/login');
                 }, 3000);
+            } else {
+                setSuccess("Account updated successfully!");
             }
         } catch (err: any) {
             setError(err.response?.data?.detail || "Failed to update account");
