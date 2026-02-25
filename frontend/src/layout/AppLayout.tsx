@@ -93,7 +93,7 @@ export const AppLayout = () => {
         { to: '/visual-analytics', label: 'Visual Analytics', roles: ['ADMIN'] },
         { to: '/ratings', label: 'Department Ratings', roles: ['ADMIN', 'DIVISION_MANAGER'] },
         { to: '/settings', label: 'System Settings', roles: ['ADMIN'] },
-        { to: '/settings/account', label: 'Account Settings', roles: ['ADMIN', 'DIVISION_MANAGER', 'DEPARTMENT_HEAD', 'SUB_DEPARTMENT_STAFF'] },
+        { to: '/account-settings', label: 'Account Settings', roles: ['ADMIN', 'DIVISION_MANAGER', 'DEPARTMENT_HEAD', 'SUB_DEPARTMENT_STAFF'] },
         { to: '/admin/users', label: 'User Management', roles: ['ADMIN'] },
     ];
 

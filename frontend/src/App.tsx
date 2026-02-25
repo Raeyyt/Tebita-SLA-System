@@ -58,7 +58,7 @@ function App() {
             <Route path="visual-analytics" element={<VisualAnalyticsPage />} />  {/* Visual Analytics Dashboard */}
             <Route path="ratings" element={<DepartmentRatingsPage />} />  {/* Department Ratings Analytics */}
             <Route path="settings" element={<SystemSettingsPage />} />  {/* System Settings */}
-            <Route path="settings/account" element={<AccountSettingsPage />} />
+            <Route path="account-settings" element={<AccountSettingsPage />} />
             <Route path="admin/users" element={<UserManagement />} />
             <Route path="reports" element={<div className="card"><h2>Reports - Coming Soon</h2></div>} />
           </Route>
