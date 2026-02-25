@@ -62,6 +62,35 @@ def create_user(
     db.refresh(db_user)
     return db_user
 
+# IMPORTANT: /me must come BEFORE /{user_id} so FastAPI matches it first
+@router.put("/me", response_model=UserRead)
+def update_current_user(
+    user_update: UserMeUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Allow any user to update their own profile information"""
+    update_data = user_update.dict(exclude_unset=True)
+    
+    # Handle username update (check uniqueness)
+    if 'username' in update_data and update_data['username'] != current_user.username:
+        existing_user = db.query(User).filter(User.username == update_data['username']).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Username already taken")
+
+    # Handle password update separately if provided
+    if 'password' in update_data and update_data['password']:
+        update_data['hashed_password'] = get_password_hash(update_data.pop('password'))
+    elif 'password' in update_data:
+        update_data.pop('password')
+        
+    for key, value in update_data.items():
+        setattr(current_user, key, value)
+        
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
 @router.put("/{user_id}", response_model=UserRead)
 def update_user(
     user_id: int,
@@ -114,31 +143,3 @@ def delete_user(
     db.delete(db_user)
     db.commit()
     return None
-
-@router.put("/me", response_model=UserRead)
-def update_current_user(
-    user_update: UserMeUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
-):
-    """Allow any user to update their own profile information"""
-    update_data = user_update.dict(exclude_unset=True)
-    
-    # Handle username update (check uniqueness)
-    if 'username' in update_data and update_data['username'] != current_user.username:
-        existing_user = db.query(User).filter(User.username == update_data['username']).first()
-        if existing_user:
-            raise HTTPException(status_code=400, detail="Username already taken")
-
-    # Handle password update separately if provided
-    if 'password' in update_data and update_data['password']:
-        update_data['hashed_password'] = get_password_hash(update_data.pop('password'))
-    elif 'password' in update_data:
-        update_data.pop('password')
-        
-    for key, value in update_data.items():
-        setattr(current_user, key, value)
-        
-    db.commit()
-    db.refresh(current_user)
-    return current_user
