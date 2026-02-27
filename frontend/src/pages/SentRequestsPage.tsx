@@ -94,39 +94,49 @@ export const SentRequestsPage = () => {
                             </thead>
                             <tbody>
                                 {requests.map((request) => (
-                                    <tr key={request.id}>
-                                        <td className="font-bold">{request.request_id}</td>
-                                        <td>
-                                            <div className="text-small text-muted">
-                                                {request.assigned_subdepartment?.name ||
-                                                    request.assigned_department?.name ||
-                                                    request.assigned_division?.name || 'Unassigned'}
-                                            </div>
-                                        </td>
-                                        <td style={{ maxWidth: '280px' }}>{request.description}</td>
-                                        <td>
-                                            <span style={badgeStyle(priorityColors[request.priority])}>{request.priority}</span>
-                                        </td>
-                                        <td>
-                                            <span
-                                                style={badgeStyle(statusColors[request.status] || '#6b7280')}
-                                            >
-                                                {request.status.replace(/_/g, ' ')}
-                                            </span>
-                                        </td>
-                                        <td>{formatDate(request.submitted_at || request.created_at)}</td>
-                                        <td>{request.acknowledged_at ? formatDate(request.acknowledged_at) : 'Pending'}</td>
-                                        <td>
-                                            {request.completed_at
-                                                ? formatDate(request.completed_at)
-                                                : '—'}
-                                        </td>
-                                        <td>
-                                            <Link to={`/requests/${request.id}`} className="btn btn-outline">
-                                                View
-                                            </Link>
-                                        </td>
-                                    </tr>
+                                    <>
+                                        <tr key={request.id}>
+                                            <td className="font-bold">{request.request_id}</td>
+                                            <td>
+                                                <div className="text-small text-muted">
+                                                    {request.assigned_subdepartment?.name ||
+                                                        request.assigned_department?.name ||
+                                                        request.assigned_division?.name || 'Unassigned'}
+                                                </div>
+                                            </td>
+                                            <td style={{ maxWidth: '280px' }}>{request.description}</td>
+                                            <td>
+                                                <span style={badgeStyle(priorityColors[request.priority])}>{request.priority}</span>
+                                            </td>
+                                            <td>
+                                                <span
+                                                    style={badgeStyle(statusColors[request.status] || '#6b7280')}
+                                                >
+                                                    {request.status.replace(/_/g, ' ')}
+                                                </span>
+                                            </td>
+                                            <td>{formatDate(request.submitted_at || request.created_at)}</td>
+                                            <td>{request.acknowledged_at ? formatDate(request.acknowledged_at) : 'Pending'}</td>
+                                            <td>
+                                                {request.completed_at
+                                                    ? formatDate(request.completed_at)
+                                                    : '—'}
+                                            </td>
+                                            <td>
+                                                <Link to={`/requests/${request.id}`} className="btn btn-outline">
+                                                    View
+                                                </Link>
+                                            </td>
+                                        </tr>
+                                        {request.status === 'REJECTED' && request.rejection_reason && (
+                                            <tr key={`${request.id}-rejection`} style={{ background: '#FEF2F2' }}>
+                                                <td colSpan={9} style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>
+                                                    <span style={{ color: '#991B1B', fontWeight: 600 }}>🚫 Rejection Reason: </span>
+                                                    <span style={{ color: '#7F1D1D' }}>{request.rejection_reason}</span>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </>
                                 ))}
                             </tbody>
                         </table>
