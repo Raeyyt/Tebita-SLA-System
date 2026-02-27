@@ -70,6 +70,7 @@ def update_current_user(
     current_user: User = Depends(get_current_active_user)
 ):
     """Allow any user to update their own profile information"""
+    from ..auth import verify_password
     update_data = user_update.dict(exclude_unset=True)
     
     # Handle username update (check uniqueness)
@@ -78,11 +79,19 @@ def update_current_user(
         if existing_user:
             raise HTTPException(status_code=400, detail="Username already taken")
 
-    # Handle password update separately if provided
+    # Handle password update — require old password first
     if 'password' in update_data and update_data['password']:
+        old_password = update_data.pop('old_password', None)
+        if not old_password:
+            raise HTTPException(status_code=400, detail="Current password is required to set a new password")
+        if not verify_password(old_password, current_user.hashed_password):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
         update_data['hashed_password'] = get_password_hash(update_data.pop('password'))
     elif 'password' in update_data:
         update_data.pop('password')
+
+    # Remove old_password from update_data — it's not a DB field
+    update_data.pop('old_password', None)
         
     for key, value in update_data.items():
         setattr(current_user, key, value)

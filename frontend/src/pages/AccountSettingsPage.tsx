@@ -12,6 +12,7 @@ export const AccountSettingsPage = () => {
         username: user?.username || '',
         full_name: user?.full_name || '',
         email: user?.email || '',
+        oldPassword: '',
         password: '',
         confirmPassword: ''
     });
@@ -30,6 +31,11 @@ export const AccountSettingsPage = () => {
             return;
         }
 
+        if (formData.password && !formData.oldPassword) {
+            setError("Please enter your current password to set a new one");
+            return;
+        }
+
         setLoading(true);
         try {
             const updateData: any = {
@@ -39,6 +45,7 @@ export const AccountSettingsPage = () => {
             };
             if (formData.password) {
                 updateData.password = formData.password;
+                updateData.old_password = formData.oldPassword;
             }
 
             if (!token) throw new Error("No auth token");
@@ -46,7 +53,7 @@ export const AccountSettingsPage = () => {
 
             setSuccess("✅ Updated Successfully!");
             // Clear password fields after successful update
-            setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
+            setFormData(prev => ({ ...prev, oldPassword: '', password: '', confirmPassword: '' }));
         } catch (err: any) {
             setError(err.response?.data?.detail || "Failed to update account");
         } finally {
@@ -130,6 +137,19 @@ export const AccountSettingsPage = () => {
 
                     <hr style={{ margin: '2rem 0', borderColor: 'rgba(255,255,255,0.1)' }} />
                     <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem' }}>Change Password (Leave blank to keep current)</h3>
+
+                    <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Current Password</label>
+                        <input
+                            type="password"
+                            name="oldPassword"
+                            value={formData.oldPassword}
+                            onChange={handleChange}
+                            className="form-input"
+                            placeholder="Enter your current password"
+                            style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white' }}
+                        />
+                    </div>
 
                     <div className="form-group" style={{ marginBottom: '1.5rem' }}>
                         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>New Password</label>
