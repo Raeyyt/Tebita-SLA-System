@@ -108,7 +108,40 @@ class TEditaPDFGenerator:
             ('RIGHTPADDING', (0, 0), (-1, -1), 10),
         ]))
         story.append(req_table)
-        story.append(Spacer(1, 10*mm))
+        story.append(Spacer(1, 5*mm))
+        
+        # 2b. Rejection Banner (if rejected)
+        status = request_data.get('status', '')
+        if status == 'REJECTED':
+            rejection_reason = request_data.get('rejection_reason', 'No reason provided.')
+            
+            reject_title_style = ParagraphStyle(
+                'RejectTitle', parent=styles['Normal'],
+                fontSize=12, fontName='Helvetica-Bold',
+                textColor=colors.HexColor('#991B1B')
+            )
+            reject_reason_style = ParagraphStyle(
+                'RejectReason', parent=styles['Normal'],
+                fontSize=10, textColor=colors.HexColor('#7F1D1D'),
+                leading=14
+            )
+            
+            reject_content = [
+                [Paragraph("🚫  REQUEST REJECTED", reject_title_style)],
+                [Paragraph(f"<b>Reason:</b> {rejection_reason}", reject_reason_style)]
+            ]
+            
+            reject_table = Table(reject_content, colWidths=[170*mm])
+            reject_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#FEF2F2')),
+                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#FECACA')),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('LEFTPADDING', (0, 0), (-1, -1), 12),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+            ]))
+            story.append(reject_table)
+            story.append(Spacer(1, 5*mm))
         
         # 3. Sender & Recipient (Side by Side)
         sender_content = [

@@ -99,6 +99,8 @@ async def generate_request_pdf(
             if item.attachment_filename
         ],
         'attachments': request.attachments or [],
+        'status': request.status.value if request.status else '',
+        'rejection_reason': request.rejection_reason or '',
         'company_location': 'https://maps.google.com/maps/place//data=!4m2!3m1!1s0x164b85001ee00be1:0xe1a1d67bd070ea7?entry=s&sa=X&ved=2ahUKEwiY2-Owj6aRAxUzUkEAHbpiHEMQ4kB6BAgVEAA&hl=en',
     }
     
